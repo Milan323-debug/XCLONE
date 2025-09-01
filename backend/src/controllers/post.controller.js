@@ -92,6 +92,7 @@ export const createPost = asyncHandler(async (req, res) => {
           { format: "auto" },
         ],
       });
+  console.log('Cloudinary upload response:', uploadResponse && uploadResponse.secure_url ? uploadResponse.secure_url : uploadResponse);
       imageUrl = uploadResponse.secure_url;
     } catch (uploadError) {
       console.error("Cloudinary upload error:", uploadError);

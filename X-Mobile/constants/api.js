@@ -1,1 +1,1 @@
-export const API_URL = "https://xclone-plum.vercel.app/"; 
+export const API_URL = "https://xclone-8miyxq6wk-milan323-debugs-projects.vercel.app/"; 
