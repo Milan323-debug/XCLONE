@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/user.model.js';
+import cloudinary from '../config/cloudinary.js';
 
 // Get current authenticated user
 export const getCurrentUser = asyncHandler(async (req, res) => {
@@ -31,6 +32,42 @@ export const updateProfile = asyncHandler(async (req, res) => {
 
 	const updates = req.body;
 	const allowed = ['firstName', 'lastName', 'bio', 'location', 'profileImage', 'bannerImage'];
+	// If profileImage or bannerImage is a base64 data URI, upload to Cloudinary
+	if (updates.profileImage && typeof updates.profileImage === 'string' && updates.profileImage.startsWith('data:')) {
+		try {
+			const uploadResponse = await cloudinary.uploader.upload(updates.profileImage, {
+				folder: 'profile_images',
+				resource_type: 'image',
+				transformation: [
+					{ width: 800, height: 800, crop: 'limit' },
+					{ quality: 'auto' },
+					{ format: 'auto' },
+				],
+			});
+			updates.profileImage = uploadResponse.secure_url;
+		} catch (uploadErr) {
+			console.error('Cloudinary upload error (profileImage):', uploadErr);
+			// leave updates.profileImage as-is; we'll still try to set it if it's a URL
+		}
+	}
+
+	if (updates.bannerImage && typeof updates.bannerImage === 'string' && updates.bannerImage.startsWith('data:')) {
+		try {
+			const uploadResponse = await cloudinary.uploader.upload(updates.bannerImage, {
+				folder: 'profile_banners',
+				resource_type: 'image',
+				transformation: [
+					{ width: 1200, height: 400, crop: 'limit' },
+					{ quality: 'auto' },
+					{ format: 'auto' },
+				],
+			});
+			updates.bannerImage = uploadResponse.secure_url;
+		} catch (uploadErr) {
+			console.error('Cloudinary upload error (bannerImage):', uploadErr);
+		}
+	}
+
 	Object.keys(updates).forEach((key) => {
 		if (allowed.includes(key)) user[key] = updates[key];
 	});
@@ -72,4 +109,3 @@ export const followUser = asyncHandler(async (req, res) => {
 });
 
 export default {};
-
