@@ -1,10 +1,11 @@
-import { View, Text, TouchableOpacity, Alert } from 'react-native'
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native'
 import React, { useState } from 'react'
 import { useAuthStore } from '../store/authStore';
 import styles from '../assets/styles/login.styles';
 import { Image } from 'expo-image';
 import { formatMemberSince } from '../lib/utils';
 import * as ImagePicker from 'expo-image-picker';
+import { API_URL } from '../constants/api';
 
 export default function ProfileHeader() {
     const { user } = useAuthStore();
@@ -30,8 +31,60 @@ export default function ProfileHeader() {
                 base64: false,
             });
             if (!result.canceled && result.assets && result.assets[0].uri) {
-                setLocalProfileImage(result.assets[0].uri);
-                // TODO: Optionally upload to backend here
+                const uri = result.assets[0].uri;
+                setLocalProfileImage(uri);
+                // upload as multipart/form-data like createPost
+                const token = useAuthStore.getState().token;
+                if (!token) {
+                    Alert.alert('Not authenticated', 'Please log in to update your profile');
+                    return;
+                }
+
+                setUploading(true);
+                try {
+                    const form = new FormData();
+                    // derive filename and type
+                    const uriParts = uri.split('/');
+                    const name = uriParts[uriParts.length - 1];
+                    const match = name.match(/\.([0-9a-z]+)(?:[\?#]|$)/i);
+                    const ext = match ? match[1] : 'jpg';
+                    const type = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+                    form.append('profileImage', {
+                        uri,
+                        name: name,
+                        type,
+                    });
+
+                    const res = await fetch(`${API_URL}/api/user/profile`, {
+                        method: 'PUT',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            // NOTE: Do not set Content-Type; fetch will set the correct boundary for multipart
+                        },
+                        body: form,
+                    });
+
+                    const json = await res.json();
+                    if (!res.ok) {
+                        console.warn('Profile image upload failed', json);
+                        Alert.alert('Upload failed', json.message || json.error || 'Could not upload image');
+                        // revert local preview if desired
+                        setLocalProfileImage(null);
+                    } else {
+                        // update auth store user with returned user
+                        const updatedUser = json.user;
+                        if (updatedUser) {
+                            useAuthStore.setState({ user: updatedUser });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Profile upload error', err);
+                    Alert.alert('Upload error', err.message || 'Could not upload image');
+                    setLocalProfileImage(null);
+                } finally {
+                    setUploading(false);
+                }
             } else if (result.canceled) {
                 // User cancelled, do nothing
                 return;
@@ -43,15 +96,22 @@ export default function ProfileHeader() {
         }
     };
 
+    const [uploading, setUploading] = useState(false);
+
     if (!user) return null;
     return (
         <View style={styles.profileHeader}>
-            <TouchableOpacity onPress={handlePickProfileImage} activeOpacity={0.7}>
+            <TouchableOpacity onPress={handlePickProfileImage} activeOpacity={0.7} disabled={uploading}>
                 <Image
                     source={{ uri: localProfileImage || user.profileImage || undefined }}
                     style={styles.profileImage}
                     contentFit="cover"
                 />
+                {uploading && (
+                    <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.4)'}}>
+                        <ActivityIndicator size="large" color="#1DA1F2" />
+                    </View>
+                )}
                 {!localProfileImage && !user.profileImage && (
                     <View style={{
                         position: 'absolute',
@@ -67,9 +127,25 @@ export default function ProfileHeader() {
                 )}
             </TouchableOpacity>
             <View style={styles.profileInfo}>
-                <Text style={styles.username}>{user.username}</Text>
-                <Text style={styles.email}>{user.email}</Text>
-                <Text style={styles.memberSince}> Joined {formatMemberSince(user.createdAt)}</Text>
+                        <Text style={styles.username}>{user.username}</Text>
+                        {user.firstName || user.lastName ? (
+                            <Text style={styles.name}>{[user.firstName, user.lastName].filter(Boolean).join(' ')}</Text>
+                        ) : null}
+                        {user.email ? <Text style={styles.email}>{user.email}</Text> : null}
+                        {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
+
+                        <View style={{ flexDirection: 'row', marginTop: 6, alignItems: 'center' }}>
+                            {typeof user.followers === 'number' && typeof user.following === 'number' ? (
+                                <>
+                                    <Text style={{ marginRight: 12, color: '#6b7280' }}>{user.following} Following</Text>
+                                    <Text style={{ color: '#6b7280' }}>{user.followers} Followers</Text>
+                                </>
+                            ) : null}
+                        </View>
+
+                        {user.location ? <Text style={{ color: '#6b7280', marginTop: 6 }}>{user.location}</Text> : null}
+                        {user.website ? <Text style={{ color: '#1DA1F2', marginTop: 6 }}>{user.website}</Text> : null}
+                        <Text style={styles.memberSince}> Joined {formatMemberSince(user.createdAt)}</Text>
             </View>
         </View>
     );

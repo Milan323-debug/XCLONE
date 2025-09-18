@@ -8,6 +8,25 @@ export const useAuthStore = create((set) => ({
     isLoading: false,
     isCheckingAuth: true,
     
+    // Fetch latest user profile from backend and update store
+    fetchMe: async () => {
+        try {
+            const token = useAuthStore.getState().token;
+            if (!token) return null;
+            const res = await fetch(`${API_URL}/api/user/me`, { headers: { Authorization: `Bearer ${token}` } });
+            if (!res.ok) return null;
+            const json = await res.json();
+            if (json.user) {
+                await AsyncStorage.setItem('user', JSON.stringify(json.user));
+                set({ user: json.user });
+            }
+            return json.user || null;
+        } catch (e) {
+            console.warn('fetchMe error', e.message);
+            return null;
+        }
+    },
+    
     register: async (username, email, password) => {
         // Early return for empty fields without setting loading state
         if (!username || !email || !password) {
@@ -75,6 +94,15 @@ export const useAuthStore = create((set) => ({
             const user = userJson ? JSON.parse(userJson) : null;
 
             set({token, user});
+            // If we have a token, try to refresh user data from server
+            if (token) {
+                try {
+                    const fn = useAuthStore.getState().fetchMe;
+                    if (fn) await fn();
+                } catch (err) {
+                    console.warn('checkAuth fetchMe error', err?.message || err);
+                }
+            }
            
         } catch (error) {
             console.log('Error checking auth:', error);

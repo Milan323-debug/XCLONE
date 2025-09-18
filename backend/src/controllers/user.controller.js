@@ -30,9 +30,31 @@ export const updateProfile = asyncHandler(async (req, res) => {
 	const user = req.user;
 	if (!user) return res.status(401).json({ message: 'Not authenticated' });
 
-	const updates = req.body;
+	// If multer processed a 'profileImage' file, it'll be available as req.file
+	// If multer processed other files (like bannerImage), they may be in req.files
+	const updates = req.body || {};
+
+	// handle multipart upload for profileImage (single file)
+	const profileFile = req.file; // from upload.single('profileImage')
+	if (profileFile && profileFile.buffer) {
+		try {
+			const base64Image = `data:${profileFile.mimetype};base64,${profileFile.buffer.toString('base64')}`;
+			const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+				folder: 'profile_images',
+				resource_type: 'image',
+				transformation: [
+					{ width: 800, height: 800, crop: 'limit' },
+					{ quality: 'auto' },
+					{ format: 'auto' },
+				],
+			});
+			updates.profileImage = uploadResponse.secure_url;
+		} catch (uploadErr) {
+			console.error('Cloudinary upload error (profileFile):', uploadErr);
+		}
+	}
 	const allowed = ['firstName', 'lastName', 'bio', 'location', 'profileImage', 'bannerImage'];
-	// If profileImage or bannerImage is a base64 data URI, upload to Cloudinary
+	// If profileImage or bannerImage is a base64 data URI (sent in body), upload to Cloudinary
 	if (updates.profileImage && typeof updates.profileImage === 'string' && updates.profileImage.startsWith('data:')) {
 		try {
 			const uploadResponse = await cloudinary.uploader.upload(updates.profileImage, {

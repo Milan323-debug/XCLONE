@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
+import PostComposer from '../../components/PostComposer'
 import { useAuthStore } from '../../store/authStore'
 import { API_URL } from '../../constants/api'
 import { COLORS } from '../../constants/colors'
@@ -66,17 +67,25 @@ export default function Profile() {
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7, allowsEditing: true })
-    if (!result.cancelled) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const asset = result.assets[0]
+      const uri = asset.uri
       if (forProfile) {
         // send as base64 string to update profile
-        updateProfileImage(`data:image/jpeg;base64,${result.base64}`)
+        // prefer asset.base64 when available
+        if (asset.base64) {
+          updateProfileImage(`data:${asset.type || 'image/jpeg'};base64,${asset.base64}`)
+        } else {
+          // fallback: try to fetch the file and convert to base64 (optional)
+          // For now, try to send the uri directly (backend expects base64) - show error
+          Alert.alert('Upload failed', 'Could not read image data. Please try a different image.')
+        }
       } else {
         // prepare file for multipart FormData
-        const uri = result.uri
-        const name = uri.split('/').pop()
-        const match = /\.(\w+)$/.exec(name)
-        const ext = match ? match[1] : 'jpg'
-        const type = `image/${ext}`
+        const name = asset.fileName || uri.split('/').pop()
+        const match = /\.(\w+)$/.exec(name || '')
+        const ext = match ? match[1] : (asset.type && asset.type.split('/').pop()) || 'jpg'
+        const type = asset.type || `image/${ext}`
         setNewImage({ uri, name, type })
       }
     }
@@ -178,30 +187,7 @@ export default function Profile() {
       </View>
 
       {/* Composer */}
-      <View style={styles.composer}>
-        <TextInput
-          placeholder="What's happening?"
-          placeholderTextColor={COLORS.textLight}
-          value={newContent}
-          onChangeText={setNewContent}
-          style={styles.composerInput}
-          multiline
-        />
-        {newImage ? (
-          <Image source={{ uri: newImage.uri }} style={styles.previewImage} />
-        ) : (
-          <View style={styles.composerActions}>
-            <TouchableOpacity onPress={() => pickImage(false)} style={styles.iconBtn}>
-              <Feather name="image" size={20} color={COLORS.primary} />
-            </TouchableOpacity>
-          </View>
-        )}
-        <View style={styles.composerFooter}>
-          <TouchableOpacity onPress={createPost} style={[styles.postBtn, { backgroundColor: posting ? COLORS.border : COLORS.primary }]} disabled={posting}>
-            {posting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff' }}>Post</Text>}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <PostComposer />
 
       <View style={{ flex: 1 }}>
         <FlatList
@@ -215,8 +201,11 @@ export default function Profile() {
                   <Image source={{ uri: item.image || item.imageUrl || (item.image && item.image.secure_url) }} style={styles.postImage} />
                 ) : null}
               </View>
-              <TouchableOpacity onPress={() => deletePost(item._id || item.id)} style={styles.deleteBtn}>
-                <Feather name="trash-2" size={18} color={COLORS.expense} />
+              <TouchableOpacity onPress={() => {
+                // show same confirm flow
+                deletePost(item._id || item.id);
+              }} style={styles.deleteBtn} activeOpacity={0.7}>
+                <Feather name="more-vertical" size={18} color={COLORS.textLight} />
               </TouchableOpacity>
             </View>
           )}

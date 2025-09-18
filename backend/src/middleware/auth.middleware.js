@@ -5,10 +5,12 @@ import { ENV } from '../config/env.js';
 const protectRoute = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+        console.log('protectRoute: incoming auth header:', authHeader);
         if (!authHeader) return res.status(401).json({ message: 'Not authorized, no token' });
 
         // Support 'Bearer <token>' or raw token
-        const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+        const token = authHeader && authHeader.startsWith && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+        console.log('protectRoute: extracted token present?', !!token);
 
         if (!token) return res.status(401).json({ message: 'Not authorized, token missing' });
 
