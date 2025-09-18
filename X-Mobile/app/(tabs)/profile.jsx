@@ -22,6 +22,7 @@ export default function Profile() {
   const [profileUser, setProfileUser] = useState(user)
   const [loading, setLoading] = useState(false)
   const [posts, setPosts] = useState([])
+  const [postsLoading, setPostsLoading] = useState(false)
 
   // composer
   const [newContent, setNewContent] = useState('')
@@ -50,6 +51,7 @@ export default function Profile() {
 
   const fetchUserPosts = async () => {
     if (!user) return
+    setPostsLoading(true)
     try {
       const username = user.username
       const res = await fetch(`${API_URL}/api/posts/user/${username}`)
@@ -57,6 +59,8 @@ export default function Profile() {
       setPosts(json.posts || [])
     } catch (e) {
       console.warn('fetchUserPosts', e.message)
+    } finally {
+      setPostsLoading(false)
     }
   }
 
@@ -190,29 +194,36 @@ export default function Profile() {
       <PostComposer />
 
       <View style={{ flex: 1 }}>
-        <FlatList
-          data={posts}
-          keyExtractor={(i) => String(i._id || i.id)}
-          renderItem={({ item }) => (
-            <View style={styles.postRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.postContent}>{item.content}</Text>
-                {(item.image || item.imageUrl || (item.image && item.image.secure_url)) ? (
-                  <Image source={{ uri: item.image || item.imageUrl || (item.image && item.image.secure_url) }} style={styles.postImage} />
-                ) : null}
+        {postsLoading && (!posts || posts.length === 0) ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={{ color: COLORS.textLight, marginTop: 8 }}>Loading posts...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={posts}
+            keyExtractor={(i) => String(i._1d || i._id || i.id)}
+            renderItem={({ item }) => (
+              <View style={styles.postRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.postContent}>{item.content}</Text>
+                  {(item.image || item.imageUrl || (item.image && item.image.secure_url)) ? (
+                    <Image source={{ uri: item.image || item.imageUrl || (item.image && item.image.secure_url) }} style={styles.postImage} />
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={() => {
+                  // show same confirm flow
+                  deletePost(item._id || item.id);
+                }} style={styles.deleteBtn} activeOpacity={0.7}>
+                  <Feather name="more-vertical" size={18} color={COLORS.textLight} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => {
-                // show same confirm flow
-                deletePost(item._id || item.id);
-              }} style={styles.deleteBtn} activeOpacity={0.7}>
-                <Feather name="more-vertical" size={18} color={COLORS.textLight} />
-              </TouchableOpacity>
-            </View>
-          )}
-          ListEmptyComponent={<View style={{ padding: 20 }}><Text style={{ color: COLORS.textLight }}>No posts yet.</Text></View>}
-          onRefresh={fetchUserPosts}
-          refreshing={false}
-        />
+            )}
+            ListEmptyComponent={<View style={{ padding: 20 }}><Text style={{ color: COLORS.textLight }}>No posts yet.</Text></View>}
+            onRefresh={fetchUserPosts}
+            refreshing={postsLoading}
+          />
+        )}
       </View>
     </View>
   )

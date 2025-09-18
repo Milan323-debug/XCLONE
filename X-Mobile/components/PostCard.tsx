@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Alert, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
@@ -101,6 +101,17 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
         <TouchableOpacity 
           style={styles.actionButton}
           activeOpacity={0.7}
+          onPress={async () => {
+            try {
+              const authorName = author?.firstName ? `${author.firstName} ${author.lastName || ''}` : (author?.name || author?.username || 'User');
+              const text = post?.content ? `${authorName}: ${post.content}` : `${authorName} shared a post.`;
+              const url = post?.image || post?.imageUrl || '';
+              const sharePayload = url ? { message: `${text}\n${url}` } : { message: text };
+              await Share.share(sharePayload);
+            } catch (err: any) {
+              Alert.alert('Share failed', err?.message || 'Could not share post');
+            }
+          }}
         >
           <View style={styles.actionIconContainer}>
             <Ionicons name="share-social-outline" size={20} color="#536471" />

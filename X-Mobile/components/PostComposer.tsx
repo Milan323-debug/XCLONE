@@ -21,7 +21,7 @@ const PostComposer = () => {
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Image source={{ uri: 'https://as1.ftcdn.net/v2/jpg/05/60/26/08/1000_F_560260880_O1V3Qm2cNO5HWjN66mBh2NrlPHNHOUxW.jpg' }} style={styles.avatar} />
+  <Image source={{ uri: user?.profileImage || 'https://as1.ftcdn.net/v2/jpg/05/60/26/08/1000_F_560260880_O1V3Qm2cNO5HWjN66mBh2NrlPHNHOUxW.jpg' }} style={styles.avatar} />
         <View style={{ flex: 1 }}>
           <View style={styles.inputWrap}>
             <TextInput

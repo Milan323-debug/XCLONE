@@ -56,7 +56,12 @@ const PostsList = ({ username }: { username?: string }) => {
         />
       ))}
 
-      <CommentsModal selectedPost={selectedPost} onClose={() => setSelectedPostId(null)} />
+      <CommentsModal
+        selectedPost={selectedPost}
+        onClose={() => setSelectedPostId(null)}
+        onCommentCreated={() => refetch()}
+        onCommentDeleted={() => refetch()}
+      />
     </>
   );
 };

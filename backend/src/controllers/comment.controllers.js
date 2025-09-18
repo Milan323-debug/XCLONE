@@ -14,9 +14,12 @@ export const getComments = asyncHandler(async (req, res) => {
 
   const comments = await Comment.find({ post: postId })
     .sort({ createdAt: -1 })
-  .populate("user", "username firstName lastName profileImage");
+    .populate("user", "username firstName lastName profileImage");
 
-  res.status(200).json({ comments });
+  // also fetch the post so frontend can show caption/content and image(s)
+  const post = await Post.findById(postId).select('content image user').populate('user', 'username firstName lastName profileImage');
+
+  res.status(200).json({ comments, post });
 });
 
 export const createComment = asyncHandler(async (req, res) => {
@@ -87,4 +90,67 @@ export const deleteComment = asyncHandler(async (req, res) => {
   await Comment.findByIdAndDelete(commentId);
 
   res.status(200).json({ message: "Comment deleted successfully" });
+});
+
+export const likeComment = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+
+  if (!mongoose.isValidObjectId(commentId)) {
+    return res.status(400).json({ error: 'Invalid commentId' });
+  }
+
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
+  const comment = await Comment.findById(commentId);
+  if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+  const isLiked = comment.likes.some((l) => l.toString() === user._id.toString());
+
+  if (isLiked) {
+    await Comment.findByIdAndUpdate(commentId, { $pull: { likes: user._id } });
+  } else {
+    await Comment.findByIdAndUpdate(commentId, { $push: { likes: user._id } });
+
+    // optional: notify the comment owner if liking someone else's comment
+    if (comment.user.toString() !== user._id.toString()) {
+      await Notification.create({
+        from: user._id,
+        to: comment.user,
+        type: 'like_comment',
+        post: comment.post,
+        comment: comment._id,
+      });
+    }
+  }
+
+  const updated = await Comment.findById(commentId).populate('user', 'username firstName lastName profileImage');
+  res.status(200).json({ comment: updated });
+});
+
+export const dislikeComment = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+
+  if (!mongoose.isValidObjectId(commentId)) {
+    return res.status(400).json({ error: 'Invalid commentId' });
+  }
+
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
+  const comment = await Comment.findById(commentId);
+  if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+  const isDisliked = comment.dislikes.some((d) => d.toString() === user._id.toString());
+
+  if (isDisliked) {
+    await Comment.findByIdAndUpdate(commentId, { $pull: { dislikes: user._id } });
+  } else {
+    // remove like if present
+    await Comment.findByIdAndUpdate(commentId, { $pull: { likes: user._id } });
+    await Comment.findByIdAndUpdate(commentId, { $push: { dislikes: user._id } });
+  }
+
+  const updated = await Comment.findById(commentId).populate('user', 'username firstName lastName profileImage');
+  res.status(200).json({ comment: updated });
 });

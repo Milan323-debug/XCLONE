@@ -1,6 +1,6 @@
 import PostComposer from "../../components/PostComposer";
 import PostsList from "../../components/PostList";
-import { usePosts } from "../../hooks/usePosts";
+import { usePosts, triggerRefetch } from "../../hooks/usePosts";
 import { useUserSync } from "../../hooks/useUserSync";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
@@ -10,12 +10,19 @@ import SignOutButton from "../../components/SignOutButton";
 
 const HomeScreen = () => {
   const [isRefetching, setIsRefetching] = useState(false);
-  const { refetch: refetchPosts } = usePosts();
+  // ensure we don't create a separate posts instance here — use the shared triggerRefetch
 
   const handlePullToRefresh = async () => {
     setIsRefetching(true);
 
-    await refetchPosts();
+    // call the shared triggerRefetch which the PostsList's usePosts instance sets
+    if (typeof triggerRefetch === 'function') {
+      try {
+        await triggerRefetch();
+      } catch (e) {
+        console.warn('refresh error', e);
+      }
+    }
     setIsRefetching(false);
   };
 
