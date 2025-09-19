@@ -162,10 +162,19 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                             setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, likes: Array.isArray(c.likes) ? (isLiked ? c.likes.filter((x: any) => x.toString() !== uid) : [...c.likes, uid]) : [uid] } : c));
                             try {
                               const res = await fetch(`${API_URL}/api/comments/${item._id}/like`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-                              if (res.status === 401) return Alert.alert('Not authorized');
-                              if (!res.ok) throw new Error('Like failed');
-                              const json = await res.json();
-                              setComments((cs) => cs.map((c) => c._id === item._id ? json.comment : c));
+                              let body: any = {};
+                              try { body = await res.json(); } catch (err) { body = {}; }
+                              if (res.status === 401) {
+                                console.warn('like backend response 401', body);
+                                return Alert.alert('Not authorized', body?.message || body?.error || '');
+                              }
+                              if (!res.ok) {
+                                console.warn('like backend response', res.status, body);
+                                const errMsg = body?.error || body?.message || `Status ${res.status}`;
+                                throw new Error(errMsg);
+                              }
+                              // success
+                              setComments((cs) => cs.map((c) => c._id === item._id ? (body?.comment ?? c) : c));
                             } catch (e: any) {
                               console.warn('like error', e.message || e);
                               setComments(prev);
@@ -186,10 +195,18 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                             setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, dislikes: Array.isArray(c.dislikes) ? (c.dislikes.some((d: any) => d.toString() === uid) ? c.dislikes.filter((x: any) => x.toString() !== uid) : [...(c.dislikes || []), uid]) : [uid] } : c));
                             try {
                               const res = await fetch(`${API_URL}/api/comments/${item._id}/dislike`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-                              if (res.status === 401) return Alert.alert('Not authorized');
-                              if (!res.ok) throw new Error('Dislike failed');
-                              const json = await res.json();
-                              setComments((cs) => cs.map((c) => c._id === item._id ? json.comment : c));
+                              let body: any = {};
+                              try { body = await res.json(); } catch (err) { body = {}; }
+                              if (res.status === 401) {
+                                console.warn('dislike backend response 401', body);
+                                return Alert.alert('Not authorized', body?.message || body?.error || '');
+                              }
+                              if (!res.ok) {
+                                console.warn('dislike backend response', res.status, body);
+                                const errMsg = body?.error || body?.message || `Status ${res.status}`;
+                                throw new Error(errMsg);
+                              }
+                              setComments((cs) => cs.map((c) => c._id === item._id ? (body?.comment ?? c) : c));
                             } catch (e: any) {
                               console.warn('dislike error', e.message || e);
                               setComments(prev);
