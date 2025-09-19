@@ -19,7 +19,7 @@ export const getComments = asyncHandler(async (req, res) => {
 
   // fetch all comments for the post
   const allComments = await Comment.find({ post: postId })
-    .sort({ createdAt: -1 })
+    .sort({ createdAt: 1 }) // Change to ascending order
     .populate('user', 'username firstName lastName profileImage')
     .lean();
 
