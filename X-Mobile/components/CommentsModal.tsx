@@ -8,6 +8,7 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
   const [comments, setComments] = useState<any[]>([]);
   const [fetchedPost, setFetchedPost] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [posting, setPosting] = useState(false);
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -15,27 +16,45 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
   const token = useAuthStore((s) => s.token);
   const currentUser = useAuthStore((s) => s.user);
 
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [total, setTotal] = useState<number | null>(null);
+
   useEffect(() => {
-    if (selectedPost) fetchComments();
+    if (selectedPost) {
+      setPage(1);
+      fetchComments(1);
+    }
   }, [selectedPost]);
 
   // Guard: avoid rendering modal content when no selectedPost — prevents null deref
   if (!selectedPost) return null;
 
-  const fetchComments = async () => {
+  const fetchComments = async (requestedPage = 1) => {
     if (!selectedPost) return;
-    setLoading(true);
-    setError(null);
+    if (requestedPage === 1) {
+      setLoading(true);
+      setError(null);
+    } else {
+      setLoadingMore(true);
+    }
     try {
-      const res = await fetch(`${API_URL}/api/comments/post/${selectedPost._id}`);
+      const res = await fetch(`${API_URL}/api/comments/post/${selectedPost._id}?page=${requestedPage}&limit=${limit}`);
       if (!res.ok) throw new Error('Failed to load comments');
       const json = await res.json();
-      setComments(json.comments || []);
+      if (requestedPage === 1) {
+        setComments(json.comments || []);
+      } else {
+        setComments((prev) => [...prev, ...(json.comments || [])]);
+      }
       if (json.post) setFetchedPost(json.post);
+      setTotal(typeof json.total === 'number' ? json.total : null);
+      setPage(requestedPage);
     } catch (e: any) {
       setError(e.message || 'Error');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -131,38 +150,52 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                       <Text style={styles.commentUser}>{item.user?.username || 'User'}</Text>
                       <Text style={styles.commentText}>{item.content}</Text>
                       <View style={{ flexDirection: 'row', marginTop: 6, alignItems: 'center' }}>
-                        <TouchableOpacity onPress={async () => {
-                          if (!token) return Alert.alert('Not signed in');
-                          // optimistic toggle
-                          const prev = comments;
-                          setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, likes: Array.isArray(c.likes) ? (isLiked ? c.likes.filter((x: any) => x.toString() !== currentUser._id) : [...c.likes, currentUser._id]) : [currentUser._id] } : c));
-                          try {
-                            const res = await fetch(`${API_URL}/api/comments/${item._id}/like`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-                            if (!res.ok) throw new Error('Like failed');
-                            const json = await res.json();
-                            setComments((cs) => cs.map((c) => c._id === item._id ? json.comment : c));
-                          } catch (e: any) {
-                            console.warn('like error', e.message || e);
-                            setComments(prev);
-                          }
-                        }} style={{ marginRight: 12 }}>
+                        <TouchableOpacity
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          accessible
+                          accessibilityLabel="Like comment"
+                          onPress={async () => {
+                            if (!token || !currentUser) return Alert.alert('Not signed in');
+                            // optimistic toggle
+                            const prev = comments;
+                            const uid = currentUser?._id;
+                            setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, likes: Array.isArray(c.likes) ? (isLiked ? c.likes.filter((x: any) => x.toString() !== uid) : [...c.likes, uid]) : [uid] } : c));
+                            try {
+                              const res = await fetch(`${API_URL}/api/comments/${item._id}/like`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+                              if (res.status === 401) return Alert.alert('Not authorized');
+                              if (!res.ok) throw new Error('Like failed');
+                              const json = await res.json();
+                              setComments((cs) => cs.map((c) => c._id === item._id ? json.comment : c));
+                            } catch (e: any) {
+                              console.warn('like error', e.message || e);
+                              setComments(prev);
+                              Alert.alert('Error', e.message || 'Failed to like comment');
+                            }
+                          }} style={{ marginRight: 12 }}>
                           <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? '#F91880' : '#536471'} />
                         </TouchableOpacity>
                         <Text style={{ color: '#6b7280', marginRight: 12 }}>{(item.likes && item.likes.length) || 0}</Text>
-                        <TouchableOpacity onPress={async () => {
-                          if (!token) return Alert.alert('Not signed in');
-                          const prev = comments;
-                          setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, dislikes: Array.isArray(c.dislikes) ? (c.dislikes.some((d: any) => d.toString() === currentUser._id) ? c.dislikes.filter((x: any) => x.toString() !== currentUser._id) : [...(c.dislikes || []), currentUser._id]) : [currentUser._id] } : c));
-                          try {
-                            const res = await fetch(`${API_URL}/api/comments/${item._id}/dislike`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-                            if (!res.ok) throw new Error('Dislike failed');
-                            const json = await res.json();
-                            setComments((cs) => cs.map((c) => c._id === item._id ? json.comment : c));
-                          } catch (e: any) {
-                            console.warn('dislike error', e.message || e);
-                            setComments(prev);
-                          }
-                        }} style={{ marginRight: 12 }}>
+                        <TouchableOpacity
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          accessible
+                          accessibilityLabel="Dislike comment"
+                          onPress={async () => {
+                            if (!token || !currentUser) return Alert.alert('Not signed in');
+                            const prev = comments;
+                            const uid = currentUser?._id;
+                            setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, dislikes: Array.isArray(c.dislikes) ? (c.dislikes.some((d: any) => d.toString() === uid) ? c.dislikes.filter((x: any) => x.toString() !== uid) : [...(c.dislikes || []), uid]) : [uid] } : c));
+                            try {
+                              const res = await fetch(`${API_URL}/api/comments/${item._id}/dislike`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+                              if (res.status === 401) return Alert.alert('Not authorized');
+                              if (!res.ok) throw new Error('Dislike failed');
+                              const json = await res.json();
+                              setComments((cs) => cs.map((c) => c._id === item._id ? json.comment : c));
+                            } catch (e: any) {
+                              console.warn('dislike error', e.message || e);
+                              setComments(prev);
+                              Alert.alert('Error', e.message || 'Failed to dislike comment');
+                            }
+                          }} style={{ marginRight: 12 }}>
                           <Ionicons name={'thumbs-down-outline'} size={18} color={'#536471'} />
                         </TouchableOpacity>
                         <Text style={{ color: '#6b7280', marginRight: 12 }}>{(item.dislikes && item.dislikes.length) || 0}</Text>
@@ -201,6 +234,19 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
             }}
           />
         )}
+
+        {/* load more button when there are more comments */}
+        {total !== null && comments.length < (total || 0) ? (
+          <View style={{ padding: 12, alignItems: 'center' }}>
+            {loadingMore ? (
+              <ActivityIndicator size="small" color="#1DA1F2" />
+            ) : (
+              <TouchableOpacity onPress={() => fetchComments(page + 1)} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#eef2ff', borderRadius: 8 }}>
+                <Text style={{ color: '#1f2937' }}>Load more comments</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.composer}>
           <Image source={{ uri: currentUser?.profileImage || 'https://i.pravatar.cc/40' }} style={styles.avatarSmall} />

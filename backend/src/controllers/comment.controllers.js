@@ -12,14 +12,25 @@ export const getComments = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Invalid postId' });
   }
 
-  const comments = await Comment.find({ post: postId })
-    .sort({ createdAt: -1 })
-    .populate("user", "username firstName lastName profileImage");
+  // pagination params
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
+  const limit = Math.min(100, Math.max(5, parseInt(req.query.limit || '50', 10)));
+  const skip = (page - 1) * limit;
 
-  // also fetch the post so frontend can show caption/content and image(s)
-  const post = await Post.findById(postId).select('content image user').populate('user', 'username firstName lastName profileImage');
+  // fetch comments and post in parallel, use lean() and select minimal fields
+  const [comments, total, post] = await Promise.all([
+    Comment.find({ post: postId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select('user content likes dislikes parentComment createdAt')
+      .populate('user', 'username firstName lastName profileImage')
+      .lean(),
+    Comment.countDocuments({ post: postId }),
+    Post.findById(postId).select('content image user').populate('user', 'username firstName lastName profileImage').lean(),
+  ]);
 
-  res.status(200).json({ comments, post });
+  res.status(200).json({ comments, total, page, limit, post });
 });
 
 export const createComment = asyncHandler(async (req, res) => {
