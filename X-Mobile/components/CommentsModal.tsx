@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, StyleSheet, ActivityIndicator, FlatList, Image, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { Modal, View, Text, StyleSheet, ActivityIndicator, FlatList, Image, TextInput, TouchableOpacity, Alert, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../constants/api';
 import { useAuthStore } from '../store/authStore';
@@ -58,6 +58,18 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
     }
   };
 
+  // small pressable wrapper for consistent touch feedback
+  const TouchableFeedback = ({ children, style, onPress, hitSlop, accessibilityLabel }: any) => (
+    <Pressable
+      onPress={onPress}
+      hitSlop={hitSlop}
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [style, { opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }]}
+    >
+      {children}
+    </Pressable>
+  );
+
   const submitComment = async () => {
     if (!token) return Alert.alert('Not signed in');
     if (!text.trim()) return;
@@ -110,9 +122,9 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
       <View style={styles.containerModal}>
         <View style={styles.header}>
           <Text style={styles.title}>Comments</Text>
-          <TouchableOpacity onPress={() => onClose && onClose()}>
+          <TouchableFeedback onPress={() => onClose && onClose()} style={{ padding: 6 }} accessibilityLabel="Close comments">
             <Text style={styles.close}>Close</Text>
-          </TouchableOpacity>
+          </TouchableFeedback>
         </View>
 
         <View style={styles.postPreview}>
@@ -216,21 +228,21 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                           <Ionicons name={'thumbs-down-outline'} size={18} color={'#536471'} />
                         </TouchableOpacity>
                         <Text style={{ color: '#6b7280', marginRight: 12 }}>{(item.dislikes && item.dislikes.length) || 0}</Text>
-                        <TouchableOpacity onPress={() => setReplyTo(item._id)}>
+                        <TouchableFeedback onPress={() => setReplyTo(item._id)} style={{ padding: 6 }} accessibilityLabel="Reply to comment">
                           <Text style={{ color: '#1DA1F2' }}>Reply</Text>
-                        </TouchableOpacity>
+                        </TouchableFeedback>
                       </View>
                     </View>
-                    <TouchableOpacity onPress={() => {
+                    <TouchableFeedback onPress={() => {
                       // three dots menu
                       const buttons: any[] = [{ text: 'Cancel', style: 'cancel' }];
                       if (currentUser && item.user && currentUser._id === item.user._id) {
                         buttons.unshift({ text: 'Delete', style: 'destructive', onPress: () => removeComment(item._id) });
                       }
                       Alert.alert('Options', undefined, buttons as any);
-                    }} style={{ padding: 8 }}>
+                    }} style={{ padding: 8 }} accessibilityLabel="Comment options">
                       <Ionicons name="ellipsis-vertical" size={18} color="#536471" />
-                    </TouchableOpacity>
+                    </TouchableFeedback>
                   </View>
                   {/* replies */}
                   {comments.filter((c) => String(c.parentComment || '') === String(item._id)).map((reply) => (
@@ -257,10 +269,10 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
           <View style={{ padding: 12, alignItems: 'center' }}>
             {loadingMore ? (
               <ActivityIndicator size="small" color="#1DA1F2" />
-            ) : (
-              <TouchableOpacity onPress={() => fetchComments(page + 1)} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#eef2ff', borderRadius: 8 }}>
+              ) : (
+              <TouchableFeedback onPress={() => fetchComments(page + 1)} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#eef2ff', borderRadius: 8 }} accessibilityLabel="Load more comments">
                 <Text style={{ color: '#1f2937' }}>Load more comments</Text>
-              </TouchableOpacity>
+              </TouchableFeedback>
             )}
           </View>
         ) : null}
@@ -272,16 +284,16 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                 <Text style={{ color: '#374151' }}>Replying to </Text>
                 <Text style={{ color: '#1DA1F2', fontWeight: '700' }}>{comments.find((c) => String(c._id) === String(replyTo))?.user?.username || 'user'}</Text>
-                <TouchableOpacity onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }}>
+                <TouchableFeedback onPress={() => setReplyTo(null)} style={{ marginLeft: 8 }} accessibilityLabel="Cancel reply">
                   <Text style={{ color: '#ef4444' }}>Cancel</Text>
-                </TouchableOpacity>
+                </TouchableFeedback>
               </View>
             ) : null}
             <TextInput placeholder={replyTo ? 'Write a reply...' : 'Write a comment...'} value={text} onChangeText={setText} style={styles.input} editable={!posting} />
           </View>
-          <TouchableOpacity onPress={submitComment} disabled={posting || !text.trim()} style={styles.sendBtn}>
+          <TouchableFeedback onPress={submitComment} style={[styles.sendBtn, { opacity: posting || !text.trim() ? 0.6 : 1 }]} accessibilityLabel="Send comment">
             <Text style={{ color: posting ? '#aaa' : '#fff' }}>{posting ? '...' : 'Send'}</Text>
-          </TouchableOpacity>
+          </TouchableFeedback>
         </View>
       </View>
     </Modal>

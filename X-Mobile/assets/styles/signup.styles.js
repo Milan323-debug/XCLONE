@@ -14,11 +14,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     borderRadius: 24,
     padding: 24,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    // removed heavy shadow to match cleaner auth form design
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 0,
   },
   header: {
     alignItems: "center",

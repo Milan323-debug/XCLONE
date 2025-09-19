@@ -32,7 +32,7 @@ const HomeScreen = () => {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111827' }}>
         <View style={{ width: 48, alignItems: 'flex-start' }}>
-          <Ionicons name="logo-twitter" size={28} color="#54C2C2" />
+          <Image source={require('../../assets/images/icon.png')} style={{ width: 40, height: 40, resizeMode: 'contain' }} />
         </View>
 
         <View style={{ flex: 1, alignItems: 'center' }}>
@@ -52,7 +52,7 @@ const HomeScreen = () => {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={handlePullToRefresh}
-            tintColor={"#1DA1F2"}
+            tintColor={"#00FFFF"}
           />
         }
       >

@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema(
     },
     profileImage: {
       type: String,
-      default: "https://api.dicebear.com/9.x/open-peeps/svg",
+      default: "https://as2.ftcdn.net/v2/jpg/05/89/93/27/1000_F_589932782_vQAEAZhHnq1QCGu5ikwrYaQD0Mmurm0N.jpg",
     },
     bannerImage: {
       type: String,

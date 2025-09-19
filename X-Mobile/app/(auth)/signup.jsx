@@ -31,8 +31,8 @@ export default function Signup() {
       <View style={styles.container}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>Bookomon</Text> 
-            <Text style={styles.subtitle}>Share your favorite reads</Text>
+            <Text style={styles.title}>Sayn</Text> 
+            <Text style={styles.subtitle}>Share your favorite Anime Thoughts</Text>
           </View>
           <View style={styles.formContainer}>
             <View style={styles.inputGroup}>
