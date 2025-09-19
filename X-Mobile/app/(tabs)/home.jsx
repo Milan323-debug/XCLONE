@@ -44,21 +44,13 @@ const HomeScreen = () => {
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 80 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={handlePullToRefresh}
-            tintColor={"#00FFFF"}
-          />
-        }
-      >
+      <View style={{ flex: 1 }}>
         <PostComposer />
-        <PostsList />
-      </ScrollView>
+        <PostsList
+          onRefresh={handlePullToRefresh}
+          refreshing={isRefetching}
+        />
+      </View>
     </View>
   );
 };

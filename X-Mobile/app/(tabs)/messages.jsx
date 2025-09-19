@@ -68,12 +68,10 @@ const MessagesScreen = () => {
         "Message Sent!",
         `Your message has been sent to ${selectedConversation.user.name}`
       );
-      // scroll the messages FlatList to bottom after sending
-      setTimeout(() => {
-        try {
-          messagesFlatRef.current?.scrollToOffset({ offset: 0, animated: true });
-        } catch (e) {}
-      }, 100);
+      // Scroll immediately without delay
+      try {
+        messagesFlatRef.current?.scrollToOffset({ offset: 0, animated: true });
+      } catch (e) {}
     }
   };
 
@@ -127,6 +125,15 @@ const MessagesScreen = () => {
         style={styles.list}
         contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={true}
+        getItemLayout={(data, index) => ({
+          length: 80, // Approximate height of each item
+          offset: 80 * index,
+          index,
+        })}
         renderItem={({ item: conversation }) => (
           <Pressable
             key={conversation.id}

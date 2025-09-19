@@ -83,15 +83,17 @@ export const useCreatePost = () => {
     const pickerOptions = {
       allowsEditing: true,
       aspect: [16, 9] as [number, number],
-      quality: 0.8,
+      quality: 0.6, // Reduced quality for better performance
+      exif: false, // Don't need EXIF data
+      base64: false, // Don't need base64
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
     };
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync(pickerOptions)
-      : await ImagePicker.launchImageLibraryAsync({ ...pickerOptions, mediaTypes: ImagePicker.MediaTypeOptions.Images });
+      : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
-    // Newer ImagePicker returns { canceled, assets } shape
-    if (!(result as any).canceled && (result as any).assets && (result as any).assets.length > 0) {
+    if (!(result as any).canceled && (result as any).assets?.[0]) {
       setSelectedImage((result as any).assets[0].uri);
     }
   };

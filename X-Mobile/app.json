@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "X-Mobile",
-    "slug": "X-Mobile",
+    "name": "Cyan",
+    "slug": "cyan-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +12,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.cyan.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -37,6 +39,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8a81f7fe-63aa-49b7-81a5-d4fcab6c1842"
+      }
     }
   }
 }

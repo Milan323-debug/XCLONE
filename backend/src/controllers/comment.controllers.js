@@ -17,20 +17,38 @@ export const getComments = asyncHandler(async (req, res) => {
   const limit = Math.min(100, Math.max(5, parseInt(req.query.limit || '50', 10)));
   const skip = (page - 1) * limit;
 
-  // fetch comments and post in parallel, use lean() and select minimal fields
-  const [comments, total, post] = await Promise.all([
-    Comment.find({ post: postId })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .select('user content likes dislikes parentComment createdAt')
-      .populate('user', 'username firstName lastName profileImage')
-      .lean(),
-    Comment.countDocuments({ post: postId }),
-    Post.findById(postId).select('content image user').populate('user', 'username firstName lastName profileImage').lean(),
-  ]);
+  // fetch all comments for the post
+  const allComments = await Comment.find({ post: postId })
+    .sort({ createdAt: -1 })
+    .populate('user', 'username firstName lastName profileImage')
+    .lean();
 
-  res.status(200).json({ comments, total, page, limit, post });
+  // create a map of comments by their ID
+  const commentMap = {};
+  allComments.forEach(comment => {
+    commentMap[comment._id] = { ...comment, replies: [] };
+  });
+
+  // nest replies under their parent comments
+  const nestedComments = [];
+  allComments.forEach(comment => {
+    if (comment.parentComment) {
+      if (commentMap[comment.parentComment]) {
+        commentMap[comment.parentComment].replies.push(commentMap[comment._id]);
+      }
+    } else {
+      nestedComments.push(commentMap[comment._id]);
+    }
+  });
+
+  // paginate the top-level comments
+  const paginatedComments = nestedComments.slice(skip, skip + limit);
+  const total = nestedComments.length;
+
+  // fetch post in parallel
+  const post = await Post.findById(postId).select('content image user').populate('user', 'username firstName lastName profileImage').lean();
+
+  res.status(200).json({ comments: paginatedComments, total, page, limit, post });
 });
 
 export const createComment = asyncHandler(async (req, res) => {
@@ -39,7 +57,7 @@ export const createComment = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(postId)) {
     return res.status(400).json({ error: 'Invalid postId' });
   }
-  const { content } = req.body;
+  const { content, parentCommentId } = req.body;
 
   if (!content || content.trim() === "") {
     return res.status(400).json({ error: "Comment content is required" });
@@ -51,19 +69,43 @@ export const createComment = asyncHandler(async (req, res) => {
 
   if (!user || !post) return res.status(404).json({ error: "User or post not found" });
 
-  const comment = await Comment.create({
+  const commentData = {
     user: user._id,
     post: postId,
     content,
-  });
+  };
+
+  if (parentCommentId) {
+    if (!mongoose.isValidObjectId(parentCommentId)) {
+      return res.status(400).json({ error: 'Invalid parentCommentId' });
+    }
+    const parentComment = await Comment.findById(parentCommentId);
+    if (!parentComment) {
+      return res.status(404).json({ error: 'Parent comment not found' });
+    }
+    commentData.parentComment = parentCommentId;
+  }
+
+  const comment = await Comment.create(commentData);
 
   // link the comment to the post
   await Post.findByIdAndUpdate(postId, {
     $push: { comments: comment._id },
   });
 
-  // create notification if not commenting on own post
-  if (post.user.toString() !== user._id.toString()) {
+  // create notification
+  if (comment.parentComment) {
+    const parentComment = await Comment.findById(comment.parentComment);
+    if (parentComment.user.toString() !== user._id.toString()) {
+      await Notification.create({
+        from: user._id,
+        to: parentComment.user,
+        type: 'reply',
+        post: postId,
+        comment: comment._id,
+      });
+    }
+  } else if (post.user.toString() !== user._id.toString()) {
     await Notification.create({
       from: user._id,
       to: post.user,

@@ -1,18 +1,44 @@
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { usePosts } from "../hooks/usePosts";
 import { Post } from "../types";
-import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet, FlatList } from "react-native";
 import PostCard from "./PostCard";
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import CommentsModal from "./CommentsModal";
 
-const PostsList = ({ username }: { username?: string }) => {
+interface PostsListProps {
+  username?: string;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}
+
+const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
   const { currentUser } = useCurrentUser();
   const { posts, isLoading, error, refetch, toggleLike, deletePost, checkIsLiked } =
     usePosts(username);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const selectedPost = selectedPostId ? posts.find((p: Post) => p._id === selectedPostId) : null;
+
+  const renderItem = useCallback(({ item: post }: { item: Post }) => (
+    <PostCard
+      key={post._id}
+      post={post}
+      onLike={toggleLike}
+      onDelete={deletePost}
+      onComment={(post: Post) => setSelectedPostId(post._id)}
+      currentUser={currentUser}
+      isLiked={checkIsLiked(post.likes, currentUser)}
+    />
+  ), [currentUser, toggleLike, deletePost, checkIsLiked]);
+
+  const keyExtractor = useCallback((item: Post) => item._id, []);
+
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: 150,
+    offset: 150 * index,
+    index,
+  }), []);
 
   if (isLoading) {
     return (
@@ -44,17 +70,22 @@ const PostsList = ({ username }: { username?: string }) => {
 
   return (
     <>
-      {posts.map((post: Post) => (
-        <PostCard
-          key={post._id}
-          post={post}
-          onLike={toggleLike}
-          onDelete={deletePost}
-          onComment={(post: Post) => setSelectedPostId(post._id)}
-          currentUser={currentUser}
-          isLiked={checkIsLiked(post.likes, currentUser)}
-        />
-      ))}
+      <FlatList
+        data={posts}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        getItemLayout={getItemLayout}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        removeClippedSubviews={true}
+        showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.5}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListHeaderComponent={<View style={{ height: 10 }} />}
+        contentContainerStyle={{ paddingBottom: 80 }}
+      />
 
       <CommentsModal
         selectedPost={selectedPost}

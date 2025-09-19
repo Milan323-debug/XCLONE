@@ -14,30 +14,44 @@ type Props = {
 const { width } = Dimensions.get('window');
 
 const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentUser, isLiked }) => {
-  const author = post?.user || post?.userId || {};
-  const isOwner = currentUser?._id === (author?._id || author?.id || author?._ref);
-  const formattedDate = post?.createdAt ? new Date(post.createdAt).toLocaleString('en-US', {
+  const author = React.useMemo(() => post?.user || post?.userId || {}, [post]);
+  const isOwner = React.useMemo(() => currentUser?._id === (author?._id || author?.id || author?._ref), [currentUser?._id, author]);
+  const formattedDate = React.useMemo(() => post?.createdAt ? new Date(post.createdAt).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: 'numeric',
     hour12: true
-  }) : '';
+  }) : '', [post?.createdAt]);
+  
+  const authorName = React.useMemo(() => 
+    author?.firstName ? `${author.firstName} ${author.lastName || ''}` : 
+    (author?.name || author?.username || 'User'),
+    [author]
+  );
+  
+  const authorUsername = React.useMemo(() => 
+    author?.username || (author?.name && author?.name.replace(/\s+/g, '').toLowerCase()) || 'username',
+    [author]
+  );
+
+  const profileImageUri = React.useMemo(() => {
+    const fallbackUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`;
+    return author?.profileImage || author?.profileImage?.secure_url || author?.avatar || fallbackUri;
+  }, [author, authorName]);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <Image 
-            source={{ 
-              uri: author?.profileImage || author?.profileImage?.secure_url || author?.avatar || `https://ui-avatars.com/api/?name=${author?.name || author?.username || 'User'}&background=random`
-            }} 
-            style={styles.avatar} 
+            source={{ uri: profileImageUri }}
+            style={styles.avatar}
           />
           <View style={styles.nameContainer}>
             <View style={styles.nameRow}>
-              <Text style={styles.username} numberOfLines={1}>{author?.firstName ? `${author.firstName} ${author.lastName || ''}` : (author?.name || author?.username || 'User')}</Text>
-              <Text style={styles.handle} numberOfLines={1}>@{author?.username || (author?.name && author?.name.replace(/\s+/g, '').toLowerCase()) || 'username'}</Text>
+              <Text style={styles.username} numberOfLines={1}>{authorName}</Text>
+              <Text style={styles.handle} numberOfLines={1}>@{authorUsername}</Text>
               <Text style={styles.dot}>·</Text>
               <Text style={styles.timestamp}>{formattedDate}</Text>
             </View>
@@ -66,6 +80,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
           source={{ uri: post.image }}
           style={styles.postImage}
           resizeMode="cover"
+          progressiveRenderingEnabled={true}
         />
       )}
 
@@ -122,7 +137,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
   );
 };
 
-export default PostCard;
+export default React.memo(PostCard);
 
 const styles = StyleSheet.create({
   container: {

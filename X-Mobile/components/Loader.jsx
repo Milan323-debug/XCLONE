@@ -1,6 +1,4 @@
-import { View, Text } from 'react-native'
-import { ActivityIndicator } from 'react-native';
-import { size } from 'expo-font';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { COLORS } from '../constants/colors';
 
 export default function Loader() {
@@ -11,7 +9,7 @@ export default function Loader() {
       alignItems: 'center',
       backgroundColor: COLORS.background,
     }}>
-      <ActivityIndicator size={size} color={COLORS.primary} />
+      <ActivityIndicator size="large" color={COLORS.primary} />
       <Text style={{ marginTop: 10, color: COLORS.text }}>Loading...</Text>
     </View>
   )

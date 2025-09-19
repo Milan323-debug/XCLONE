@@ -20,34 +20,53 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
+    if (!fontsLoaded) return;
+    
+    async function prepare() {
+      try {
+        await checkAuth();
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn('Error in prepare:', e);
+      }
     }
-  }, [fontsLoaded]);
+    prepare();
+  }, [fontsLoaded, checkAuth]);
 
   useEffect(() => {
-  setTimeout(() => {
-    checkAuth();
+    if (!fontsLoaded) return;
+
     const inAuthScreen = segments[0] === "(auth)";
     const isSignedIn = user && token;
 
-    if (!inAuthScreen && !isSignedIn) {
+    if (isSignedIn && inAuthScreen) {
+      router.replace("/(tabs)/home");
+    } else if (!isSignedIn && !inAuthScreen) {
       router.replace("/(auth)");
     }
-    else if (inAuthScreen && isSignedIn) {
-      // Navigate explicitly to the home screen inside the (tabs) group
-      router.replace("/(tabs)/home");
-    }
-  }, 100);
-}, [user, token, segments]);
+  }, [user, token, segments, fontsLoaded]);
 
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <SafeAreaProvider>
       <SafeScreen>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="(auth)" />
+          <Stack.Screen 
+            name="(auth)" 
+            options={{
+              animation: 'none',
+            }}
+          />
+          <Stack.Screen 
+            name="(tabs)" 
+            options={{
+              animation: 'none',
+            }}
+          />
         </Stack>
       </SafeScreen>
       <StatusBar style = "dark"/>
