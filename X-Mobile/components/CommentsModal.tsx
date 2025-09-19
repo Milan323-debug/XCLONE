@@ -44,9 +44,12 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
       const json = await res.json();
       
       if (requestedPage === 1) {
-        setComments(json.comments || []);
+        // normalize: ensure each top-level comment has a replies array
+        const normalized = (json.comments || []).map((c: any) => ({ ...c, replies: c.replies || [] }));
+        setComments(normalized);
       } else {
-        setComments((prev) => [...prev, ...(json.comments || [])]);
+        const normalized = (json.comments || []).map((c: any) => ({ ...c, replies: c.replies || [] }));
+        setComments((prev) => [...prev, ...normalized]);
       }
       if (json.post) setFetchedPost(json.post);
       setTotal(typeof json.total === 'number' ? json.total : null);
@@ -76,11 +79,11 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
     if (!text.trim()) return;
     setPosting(true);
     try {
-      const body: any = { 
+      const body: any = {
         content: text.trim(),
-        parentComment: replyTo || null
+        parentCommentId: replyTo || null,
       };
-      
+
       const res = await fetch(`${API_URL}/api/comments/post/${selectedPost._id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -88,31 +91,52 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || json.message || 'Failed to post comment');
-      
+
       // Add the new comment to the list
       setComments((currentComments) => {
-        const newComment = { ...json.comment, user: currentUser }; // Add user info to new comment
-        
+        const newComment = json.comment;
+
         if (replyTo) {
           // For replies, find the parent comment and add the reply to its replies array
-          return currentComments.map(c => {
-            if (c._id === replyTo) {
-              return {
-                ...c,
-                replies: [...(c.replies || []), newComment]
-              };
+          const found = currentComments.some((c) => c._id === replyTo);
+          if (found) {
+            return currentComments.map((c) => {
+              if (c._id === replyTo) {
+                return {
+                  ...c,
+                  replies: [...(c.replies || []), newComment],
+                };
+              }
+              return c;
+            });
+          }
+
+          // parent not found locally: fetch the parent subtree and insert it so reply appears nested
+          (async () => {
+            try {
+              const r = await fetch(`${API_URL}/api/comments/${replyTo}`);
+              if (!r.ok) throw new Error('Failed to fetch parent comment');
+              const j = await r.json();
+              const parent = j.comment;
+              if (parent) {
+                setComments((prev) => [parent, ...prev]);
+              }
+            } catch (err) {
+              // fallback: prepend the raw reply so user sees it immediately
+              setComments((prev) => [newComment, ...prev]);
             }
-            return c;
-          });
+          })();
+
+          return currentComments;
         }
-        
+
         // For top-level comments, add to the beginning
         return [newComment, ...currentComments];
       });
-      
+
       // Clear reply state when posted
       setReplyTo(null);
-  if (typeof onCommentCreated === 'function') onCommentCreated();
+      if (typeof onCommentCreated === 'function') onCommentCreated();
       setText('');
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Could not post comment');
@@ -578,19 +602,19 @@ const styles = StyleSheet.create({
   },
   replyTextContainer: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 8,
-    paddingHorizontal: 12
+    backgroundColor: '#fbfdff',
+    borderRadius: 10,
+    padding: 6,
+    paddingHorizontal: 10
   },
   replyUsername: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: 2
   },
   replyText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#334155',
     lineHeight: 18
   },

@@ -115,7 +115,13 @@ export const createComment = asyncHandler(async (req, res) => {
     });
   }
 
-  res.status(201).json({ comment });
+  // populate the created comment so client receives user and parent info
+  const newComment = await Comment.findById(comment._id)
+    .populate('user', 'username firstName lastName profileImage')
+    .populate({ path: 'parentComment', populate: { path: 'user', select: 'username firstName lastName profileImage' } })
+    .lean();
+
+  res.status(201).json({ comment: newComment });
 });
 
 export const deleteComment = asyncHandler(async (req, res) => {
@@ -134,13 +140,27 @@ export const deleteComment = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "You can only delete your own comments" });
   }
 
-  // remove comment from post
+  // collect all descendant comment ids (including this one)
+  const toDelete = [commentId];
+  const stack = [commentId];
+  while (stack.length) {
+    const id = stack.pop();
+    // find direct children
+    // eslint-disable-next-line no-await-in-loop
+    const children = await Comment.find({ parentComment: id }).select('_id').lean();
+    for (const child of children) {
+      toDelete.push(String(child._id));
+      stack.push(String(child._id));
+    }
+  }
+
+  // remove all references from the post
   await Post.findByIdAndUpdate(comment.post, {
-    $pull: { comments: commentId },
+    $pull: { comments: { $in: toDelete } },
   });
 
-  // delete the comment
-  await Comment.findByIdAndDelete(commentId);
+  // delete all comments in one go
+  await Comment.deleteMany({ _id: { $in: toDelete } });
 
   res.status(200).json({ message: "Comment deleted successfully" });
 });
@@ -206,4 +226,41 @@ export const dislikeComment = asyncHandler(async (req, res) => {
 
   const updated = await Comment.findById(commentId).populate('user', 'username firstName lastName profileImage');
   res.status(200).json({ comment: updated });
+});
+
+export const getCommentById = asyncHandler(async (req, res) => {
+  const { commentId } = req.params;
+
+  if (!mongoose.isValidObjectId(commentId)) {
+    return res.status(400).json({ error: 'Invalid commentId' });
+  }
+
+  const rootComment = await Comment.findById(commentId)
+    .populate('user', 'username firstName lastName profileImage')
+    .lean();
+
+  if (!rootComment) return res.status(404).json({ error: 'Comment not found' });
+
+  // fetch all comments for the same post so we can assemble the subtree
+  const allComments = await Comment.find({ post: rootComment.post })
+    .sort({ createdAt: 1 })
+    .populate('user', 'username firstName lastName profileImage')
+    .lean();
+
+  const commentMap = {};
+  allComments.forEach((c) => {
+    commentMap[c._id] = { ...c, replies: [] };
+  });
+
+  allComments.forEach((c) => {
+    if (c.parentComment) {
+      if (commentMap[c.parentComment]) {
+        commentMap[c.parentComment].replies.push(commentMap[c._id]);
+      }
+    }
+  });
+
+  const subtree = commentMap[rootComment._id] || { ...rootComment, replies: [] };
+
+  res.status(200).json({ comment: subtree });
 });
