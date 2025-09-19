@@ -121,6 +121,33 @@ export const createComment = asyncHandler(async (req, res) => {
     .populate({ path: 'parentComment', populate: { path: 'user', select: 'username firstName lastName profileImage' } })
     .lean();
 
+  // if this is a reply, also build and return the parent subtree so the client can
+  // immediately update the nested view without an extra fetch
+  if (newComment.parentComment) {
+    const parentId = newComment.parentComment._id || newComment.parentComment;
+
+    // fetch all comments for the post and assemble subtree rooted at parentId
+    const allComments = await Comment.find({ post: postId })
+      .sort({ createdAt: 1 })
+      .populate('user', 'username firstName lastName profileImage')
+      .lean();
+
+    const commentMap = {};
+    allComments.forEach((c) => {
+      commentMap[c._id] = { ...c, replies: [] };
+    });
+    allComments.forEach((c) => {
+      if (c.parentComment) {
+        if (commentMap[c.parentComment]) {
+          commentMap[c.parentComment].replies.push(commentMap[c._id]);
+        }
+      }
+    });
+
+    const parentSubtree = commentMap[parentId] || null;
+    return res.status(201).json({ comment: newComment, parent: parentSubtree });
+  }
+
   res.status(201).json({ comment: newComment });
 });
 

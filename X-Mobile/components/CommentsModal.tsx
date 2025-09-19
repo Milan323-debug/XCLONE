@@ -111,7 +111,13 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
             });
           }
 
-          // parent not found locally: fetch the parent subtree and insert it so reply appears nested
+          // parent not found locally: if server provided parent subtree use it,
+          // otherwise fetch parent subtree as fallback
+          if (json.parent) {
+            setComments((prev) => [json.parent, ...prev]);
+            return currentComments;
+          }
+
           (async () => {
             try {
               const r = await fetch(`${API_URL}/api/comments/${replyTo}`);
@@ -120,6 +126,7 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
               const parent = j.comment;
               if (parent) {
                 setComments((prev) => [parent, ...prev]);
+                return;
               }
             } catch (err) {
               // fallback: prepend the raw reply so user sees it immediately
