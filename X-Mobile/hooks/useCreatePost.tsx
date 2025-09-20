@@ -124,10 +124,10 @@ export const useCreatePost = () => {
           
           console.log(`Starting video upload... File size: ${fileSizeMB.toFixed(2)}MB`);
           
-          if (fileSizeMB > 8) {
+          if (fileSizeMB > 100) {
             Alert.alert(
               'Video Too Large',
-              'Please record a shorter video or use lower quality settings. Maximum size is 8MB.',
+              'The video file is too large. Maximum size is 100MB.',
               [{ text: 'OK' }]
             );
             throw new Error('Video file too large');
@@ -262,16 +262,16 @@ export const useCreatePost = () => {
     const pickerOptions: any = {
       allowsEditing: true,
       aspect: [16, 9] as [number, number],
-      quality: mediaKind === 'video' ? 0.2 : 0.6, // Very low quality for videos
+      quality: mediaKind === 'video' ? 0.7 : 0.8, // Better quality for videos
       exif: false,
       base64: false,
       mediaTypes: ImagePicker.MediaTypeOptions.All,
-      videoMaxDuration: 15, // Limit videos to 15 seconds
-      duration: 15,
-      // Force low quality video
+      videoMaxDuration: 180, // Allow up to 3 minutes
+      duration: 180,
+      // Allow higher quality video
       videoQuality: Platform.OS === 'ios' 
-        ? ImagePicker.UIImagePickerControllerQualityType.Low 
-        : 'low',
+        ? ImagePicker.UIImagePickerControllerQualityType.High
+        : 'high',
     };
 
     if (mediaKind === 'image') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Images;
