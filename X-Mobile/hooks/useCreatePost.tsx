@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { API_URL } from "../constants/api";
 import { useAuthStore } from "../store/authStore";
@@ -7,7 +7,8 @@ import { triggerRefetch } from './usePosts';
 
 export const useCreatePost = () => {
   const [content, setContent] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedMediaUri, setSelectedMediaUri] = useState<string | null>(null);
+  const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video' | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   const sendCreatePost = async (postData: { content: string; mediaUri?: string; mediaType?: string }) => {
@@ -16,49 +17,230 @@ export const useCreatePost = () => {
       const formData = new FormData();
       if (postData.content) formData.append("content", postData.content);
 
+      console.log('Creating post with content:', postData.content);
+      console.log('Media URI:', postData.mediaUri);
+      console.log('Media type:', postData.mediaType);
+
       if (postData.mediaUri) {
         // infer file extension
         const uriParts = postData.mediaUri.split(".");
         const fileType = uriParts[uriParts.length - 1].toLowerCase();
-        const isVideo = (postData.mediaType || "").startsWith("video") || ["mp4", "mov", "mkv"].includes(fileType);
+        const isVideo = (postData.mediaType || "").startsWith("video") || ["mp4", "mov", "mkv", "webm", "3gp"].includes(fileType);
         const mimeType = postData.mediaType || (isVideo ? `video/${fileType}` : `image/${fileType}`);
+        // On Android use the RN file object form (avoids issues fetching file:// URIs as blobs)
+        if (Platform.OS === 'android') {
+          // For video files, we need to handle them specially
+          if (postData.mediaType?.startsWith('video/') || fileType === 'mp4') {
+            try {
+              // Access the file to check its size
+              const response = await fetch(postData.mediaUri);
+              const blob = await response.blob();
+              const fileSize = blob.size;
+              
+              console.log(`Preparing video upload. Size: ${(fileSize / (1024 * 1024)).toFixed(2)}MB`);
+              
+              if (fileSize > 50 * 1024 * 1024) { // 50MB limit
+                Alert.alert(
+                  'Video Too Large',
+                  'Please select a video smaller than 50MB',
+                  [{ text: 'OK' }]
+                );
+                throw new Error('Video file too large');
+              }
+              
+              // Add video-specific headers to help with upload
+              formData.append('fileSize', fileSize.toString());
+              formData.append('fileType', 'video/mp4');
+            } catch (e) {
+              console.error('Error preparing video:', e);
+              const errorMessage = typeof e === 'object' && e !== null && 'message' in e ? (e as { message?: string }).message : String(e);
+              throw new Error('Could not prepare video for upload: ' + errorMessage);
+            }
+          }
 
-        formData.append("media", {
-          uri: postData.mediaUri,
-          name: `media.${fileType}`,
-          type: mimeType,
-        } as any);
+          // Determine proper MIME type based on file extension
+          let finalMimeType = mimeType;
+          if (fileType === 'jpeg') {
+            finalMimeType = 'image/jpeg';
+          } else if (fileType === 'mp4') {
+            finalMimeType = 'video/mp4';
+          } else if (fileType === 'mov') {
+            finalMimeType = 'video/quicktime';
+          } else if (fileType === '3gp') {
+            finalMimeType = 'video/3gpp';
+          } else if (fileType === 'mkv') {
+            finalMimeType = 'video/x-matroska';
+          }
+
+          const mediaFile = {
+            uri: postData.mediaUri,
+            name: `upload.${fileType}`,
+            type: finalMimeType,
+          };
+          
+          console.log('Appending media for Android:', mediaFile);
+          formData.append("media", mediaFile as any);
+        } else {
+          // On iOS/web try blob approach first, fallback to RN file object
+          try {
+            const uriToFetch = postData.mediaUri;
+            const response = await fetch(uriToFetch);
+            const blob = await response.blob();
+            const fileName = `media.${fileType}`;
+            formData.append('media', blob as any, fileName);
+          } catch (blobErr: any) {
+            console.warn('blob append failed, falling back to RN file object', String(blobErr));
+            formData.append("media", {
+              uri: postData.mediaUri,
+              name: `media.${fileType}`,
+              type: mimeType,
+            } as any);
+          }
+        }
       }
 
-        const token = useAuthStore.getState().token;
-        if (!token) {
-          setIsCreating(false);
-          Alert.alert("Not authenticated", "Please log in before creating a post");
-          throw new Error("No auth token");
+      const token = useAuthStore.getState().token;
+      if (!token) {
+        setIsCreating(false);
+        Alert.alert("Not authenticated", "Please log in before creating a post");
+        throw new Error("No auth token");
+      }
+
+      const endpoint = `${API_URL.replace(/\/$/, '')}/api/posts`;
+      console.log('createPost: POST', endpoint, 'token?', !!token);
+      
+      // For video uploads, use fetch with a longer timeout
+      if (postData.mediaType?.startsWith('video/') || postData.mediaUri?.endsWith('.mp4')) {
+        try {
+          if (!postData.mediaUri) {
+            throw new Error('No media URI provided');
+          }
+
+          // Check file size before upload
+          const response = await fetch(postData.mediaUri);
+          const blob = await response.blob();
+          const fileSize = blob.size;
+          const fileSizeMB = fileSize / (1024 * 1024);
+          
+          console.log(`Starting video upload... File size: ${fileSizeMB.toFixed(2)}MB`);
+          
+          if (fileSizeMB > 8) {
+            Alert.alert(
+              'Video Too Large',
+              'Please record a shorter video or use lower quality settings. Maximum size is 8MB.',
+              [{ text: 'OK' }]
+            );
+            throw new Error('Video file too large');
+          }
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes timeout
+          
+          const response2 = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'multipart/form-data'
+            },
+            body: formData,
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+
+          if (!response2.ok) {
+            const errorText = await response2.text();
+            console.error('Upload failed:', {
+              status: response2.status,
+              statusText: response2.statusText,
+              error: errorText
+            });
+            throw new Error(`Upload failed: ${response2.status} ${errorText}`);
+          }
+
+          console.log('Video upload successful');
+          const result = await response2.json();
+          
+          // Reset form state on success
+          setContent("");
+          setSelectedMediaUri(null);
+          setSelectedMediaType(null);
+          Alert.alert("Success", "Video post created successfully!");
+          try { if (typeof triggerRefetch === 'function') void triggerRefetch(); } catch (e) {}
+          
+          return result;
+        } catch (error: any) {
+          if (error.name === 'TimeoutError') {
+            console.error('Upload timed out - video may be too large');
+            Alert.alert(
+              'Upload Timeout',
+              'The video upload timed out. Try a shorter or lower quality video.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            console.error('Video upload error:', error);
+          }
+          throw error;
+        }
+      }
+      
+      // For non-video content, use regular fetch with shorter timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout after 30s')), 30000)
+      );
+      
+      try {
+        // Log the full FormData contents for debugging
+        console.log('FormData entries:', 
+          [...(formData as any).entries()].map(([key, value]: [string, any]) => ({
+            key,
+            type: typeof value,
+            isFile: value instanceof File,
+            isBlob: value instanceof Blob,
+            uri: value?.uri,
+            mimeType: value?.type
+          }))
+        );
+
+        // Race the fetch against a timeout
+        const res = await Promise.race([
+          fetch(endpoint, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Accept': 'application/json',
+            },
+            body: formData,
+          }),
+          timeoutPromise
+        ]) as Response;
+        
+        console.log('Response status:', res.status);
+        const responseHeaders = Object.fromEntries([...res.headers.entries()]);
+        console.log('Response headers:', JSON.stringify(responseHeaders));
+        
+        if (!res.ok) {
+          const text = await res.text();
+          console.error('Server error response:', text);
+          throw new Error(text || "Failed to create post");
         }
 
-        console.log('useCreatePost: sending create-post with token present?', !!token);
-        const res = await fetch(`${API_URL}api/posts`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to create post");
+        // success
+        setContent("");
+        setSelectedMediaUri(null);
+        setSelectedMediaType(null);
+        Alert.alert("Success", "Post created successfully!");
+        try { if (typeof triggerRefetch === 'function') void triggerRefetch(); } catch (e) {}
+        return await res.json();
+      } catch (networkErr: any) {
+        // More detailed network error handling / logging
+        console.error('createPost network error', networkErr?.name, networkErr?.message, networkErr);
+        Alert.alert('Network error', networkErr?.message || 'Network request failed');
+        throw networkErr;
       }
-
-  // success
-  setContent("");
-  setSelectedImage(null);
-  Alert.alert("Success", "Post created successfully!");
-  // trigger any post list refetch
-  try { if (typeof triggerRefetch === 'function') void triggerRefetch(); } catch (e) {}
-  return await res.json();
     } catch (err: any) {
+      console.error('sendCreatePost caught error', err?.name, err?.message, err);
       Alert.alert("Error", err?.message || "Failed to create post. Please try again.");
       throw err;
     } finally {
@@ -66,7 +248,7 @@ export const useCreatePost = () => {
     }
   };
 
-  const handleImagePicker = async (useCamera: boolean = false) => {
+  const handleMediaPicker = async (useCamera: boolean = false, mediaKind: 'image' | 'video' | 'all' = 'all') => {
     const permissionResult = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -77,14 +259,23 @@ export const useCreatePost = () => {
       return;
     }
 
-    const pickerOptions = {
+    const pickerOptions: any = {
       allowsEditing: true,
       aspect: [16, 9] as [number, number],
-      quality: 0.6, // Reduced quality for better performance
-      exif: false, // Don't need EXIF data
-      base64: false, // Don't need base64
+      quality: mediaKind === 'video' ? 0.2 : 0.6, // Very low quality for videos
+      exif: false,
+      base64: false,
       mediaTypes: ImagePicker.MediaTypeOptions.All,
+      videoMaxDuration: 15, // Limit videos to 15 seconds
+      duration: 15,
+      // Force low quality video
+      videoQuality: Platform.OS === 'ios' 
+        ? ImagePicker.UIImagePickerControllerQualityType.Low 
+        : 'low',
     };
+
+    if (mediaKind === 'image') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Images;
+    if (mediaKind === 'video') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Videos;
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync(pickerOptions)
@@ -92,31 +283,54 @@ export const useCreatePost = () => {
 
     if (!(result as any).canceled && (result as any).assets?.[0]) {
       const asset = (result as any).assets[0];
-      // set selectedImage to uri; we also store media type by encoding into a tuple string 'uri||type'
-      // but here we'll keep selectedImage as uri and rely on mime detection later
-      setSelectedImage(asset.uri);
+      
+      // Check file size for videos
+      if (asset.fileSize && (asset.type?.startsWith('video') || asset.uri.match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i))) {
+        const sizeMB = asset.fileSize / (1024 * 1024);
+        console.log(`Video size: ${sizeMB.toFixed(2)}MB`);
+        
+        if (sizeMB > 10) { // Limit to 10MB
+          Alert.alert(
+            'Video Too Large',
+            'Please select a shorter video or use a lower quality setting. Maximum size is 10MB.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+      
+      setSelectedMediaUri(asset.uri);
+      const detectedType = (asset.type && asset.type.startsWith('video')) || (asset.mediaType && asset.mediaType === 'video') || String(asset.uri).match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i)
+        ? 'video' : 'image';
+      setSelectedMediaType(detectedType);
     }
   };
 
   const createPost = () => {
-    if (!content.trim() && !selectedImage) {
+    if (!content.trim() && !selectedMediaUri) {
       Alert.alert("Empty Post", "Please write something or add media before posting!");
       return;
     }
 
     const postData: { content: string; mediaUri?: string; mediaType?: string } = { content: content.trim() };
-    if (selectedImage) postData.mediaUri = selectedImage;
+    if (selectedMediaUri) {
+      postData.mediaUri = selectedMediaUri;
+      if (selectedMediaType) postData.mediaType = selectedMediaType;
+    }
     void sendCreatePost(postData);
   };
 
   return {
     content,
     setContent,
-    selectedImage,
-  isCreating,
-    pickImageFromGallery: () => handleImagePicker(false),
-    takePhoto: () => handleImagePicker(true),
-    removeImage: () => setSelectedImage(null),
+    selectedMediaUri,
+    selectedMediaType,
+    isCreating,
+    pickImageFromGallery: () => handleMediaPicker(false, 'image'),
+    pickVideoFromGallery: () => handleMediaPicker(false, 'video'),
+    takePhoto: () => handleMediaPicker(true, 'image'),
+    recordVideo: () => handleMediaPicker(true, 'video'),
+    removeMedia: () => { setSelectedMediaUri(null); setSelectedMediaType(null); },
     createPost,
   };
 };

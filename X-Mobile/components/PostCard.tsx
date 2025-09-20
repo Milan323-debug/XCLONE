@@ -35,6 +35,10 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
     return author?.profileImage || author?.profileImage?.secure_url || author?.avatar || fallbackUri;
   }, [author, authorName]);
 
+  // support legacy posts that used `image` or `imageUrl` and new `media` object
+  const mediaUrl = React.useMemo(() => post?.media?.url || post?.image || post?.imageUrl || '', [post]);
+  const mediaType = React.useMemo(() => post?.media?.type || (post?.image || post?.imageUrl ? 'image' : undefined), [post]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -71,21 +75,23 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
       {/* Content then full-width image to preserve original aspect ratio in feed */}
       <Text style={styles.content}>{post?.content}</Text>
 
-      {/* render media (image/video) if available */}
-      {post?.media?.url && (post.media.type === 'video') ? (
-        <Video
-          source={{ uri: post.media.url }}
-          style={styles.postImage}
-          useNativeControls
-          isLooping
-        />
-      ) : post?.media?.url ? (
-        <Image
-          source={{ uri: post.media.url }}
-          style={styles.postImage}
-          resizeMode="cover"
-          progressiveRenderingEnabled={true}
-        />
+      {/* render media (image/video) if available; fall back to legacy fields */}
+      {mediaUrl ? (
+        mediaType === 'video' ? (
+          <Video
+            source={{ uri: mediaUrl }}
+            style={styles.postImage}
+            useNativeControls
+            isLooping
+          />
+        ) : (
+          <Image
+            source={{ uri: mediaUrl }}
+            style={styles.postImage}
+            resizeMode="cover"
+            progressiveRenderingEnabled={true}
+          />
+        )
       ) : null}
 
       {/* metadata removed from under image to keep feed minimal */}

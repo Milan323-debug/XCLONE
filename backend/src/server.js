@@ -14,7 +14,16 @@ const app = express();
 
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // increased payload limit
+
+// Configure Express to handle large uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Configure body-parser limits
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+  next();
+});
 
 app.use("/api/auth", authRoutes);
 

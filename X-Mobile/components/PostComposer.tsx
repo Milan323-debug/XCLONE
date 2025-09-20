@@ -9,11 +9,14 @@ const PostComposer = () => {
   const {
     content,
     setContent,
-    selectedImage,
+    selectedMediaUri,
+    selectedMediaType,
     isCreating,
     pickImageFromGallery,
+    pickVideoFromGallery,
     takePhoto,
-    removeImage,
+    recordVideo,
+    removeMedia,
     createPost,
   } = useCreatePost();
 
@@ -36,26 +39,26 @@ const PostComposer = () => {
         </View>
       </View>
 
-      {selectedImage && (
+      {selectedMediaUri && (
         <View style={styles.previewWrap}>
           <View>
             {/* rudimentary mime check to decide image vs video preview */}
-            {selectedImage.match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i) ? (
+            {selectedMediaType === 'video' || selectedMediaUri.match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i) ? (
               <Video
-                source={{ uri: selectedImage }}
+                source={{ uri: selectedMediaUri! }}
                 style={styles.preview}
                 useNativeControls
                 isLooping
               />
             ) : (
               <Image
-                source={{ uri: selectedImage }}
+                source={{ uri: selectedMediaUri! }}
                 style={styles.preview}
                 resizeMode="cover"
               />
             )}
 
-            <TouchableOpacity style={styles.removeBtn} onPress={removeImage}>
+            <TouchableOpacity style={styles.removeBtn} onPress={removeMedia}>
               <Feather name="x" size={16} color="white" />
             </TouchableOpacity>
           </View>
@@ -64,11 +67,17 @@ const PostComposer = () => {
 
       <View style={styles.footerRow}>
         <View style={styles.leftIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={pickImageFromGallery}>
+          <TouchableOpacity style={styles.iconBtn} onPress={pickImageFromGallery} accessibilityLabel="Pick image">
             <Feather name="image" size={20} color="#1DA1F2" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={takePhoto}>
+          <TouchableOpacity style={styles.iconBtn} onPress={pickVideoFromGallery} accessibilityLabel="Pick video">
+            <Feather name="video" size={20} color="#1DA1F2" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={takePhoto} accessibilityLabel="Take photo">
             <Feather name="camera" size={20} color="#1DA1F2" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={recordVideo} accessibilityLabel="Record video">
+            <Feather name="video" size={20} color="#0ea5e9" />
           </TouchableOpacity>
         </View>
 
@@ -80,14 +89,14 @@ const PostComposer = () => {
           )}
 
           <TouchableOpacity
-            style={[styles.postBtn, (content.trim() || selectedImage) ? styles.postBtnActive : styles.postBtnDisabled]}
+            style={[styles.postBtn, (content.trim() || selectedMediaUri) ? styles.postBtnActive : styles.postBtnDisabled]}
             onPress={createPost}
-            disabled={isCreating || !(content.trim() || selectedImage)}
+            disabled={isCreating || !(content.trim() || selectedMediaUri)}
           >
             {isCreating ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <Text style={(content.trim() || selectedImage) ? styles.postBtnTextActive : styles.postBtnTextDisabled}>Post</Text>
+              <Text style={(content.trim() || selectedMediaUri) ? styles.postBtnTextActive : styles.postBtnTextDisabled}>Post</Text>
             )}
           </TouchableOpacity>
         </View>
