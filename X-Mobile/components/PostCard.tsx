@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Alert, Share } from 'react-native';
+import { Video } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
+import { formatRelativeTime } from '../lib/timeUtils';
 
 type Props = {
   post?: any;
@@ -16,21 +18,14 @@ const { width } = Dimensions.get('window');
 const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentUser, isLiked }) => {
   const author = React.useMemo(() => post?.user || post?.userId || {}, [post]);
   const isOwner = React.useMemo(() => currentUser?._id === (author?._id || author?.id || author?._ref), [currentUser?._id, author]);
-  const formattedDate = React.useMemo(() => post?.createdAt ? new Date(post.createdAt).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: true
-  }) : '', [post?.createdAt]);
-  
-  const authorName = React.useMemo(() => 
-    author?.firstName ? `${author.firstName} ${author.lastName || ''}` : 
-    (author?.name || author?.username || 'User'),
+  const formattedDate = React.useMemo(() => post?.createdAt ? formatRelativeTime(post.createdAt) : '', [post?.createdAt]);
+
+  const authorName = React.useMemo(() =>
+    author?.firstName ? `${author.firstName} ${author.lastName || ''}` : (author?.name || author?.username || 'User'),
     [author]
   );
-  
-  const authorUsername = React.useMemo(() => 
+
+  const authorUsername = React.useMemo(() =>
     author?.username || (author?.name && author?.name.replace(/\s+/g, '').toLowerCase()) || 'username',
     [author]
   );
@@ -44,7 +39,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.userInfo}>
-          <Image 
+          <Image
             source={{ uri: profileImageUri }}
             style={styles.avatar}
           />
@@ -58,7 +53,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
           </View>
         </View>
         {isOwner && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => {
               Alert.alert('Are you sure you want to delete this post?', undefined, [
                 { text: 'Cancel', style: 'cancel' },
@@ -73,20 +68,31 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
         )}
       </View>
 
+      {/* Content then full-width image to preserve original aspect ratio in feed */}
       <Text style={styles.content}>{post?.content}</Text>
 
-      {post?.image && (
+      {/* render media (image/video) if available */}
+      {post?.media?.url && (post.media.type === 'video') ? (
+        <Video
+          source={{ uri: post.media.url }}
+          style={styles.postImage}
+          useNativeControls
+          isLooping
+        />
+      ) : post?.media?.url ? (
         <Image
-          source={{ uri: post.image }}
+          source={{ uri: post.media.url }}
           style={styles.postImage}
           resizeMode="cover"
           progressiveRenderingEnabled={true}
         />
-      )}
+      ) : null}
+
+      {/* metadata removed from under image to keep feed minimal */}
 
       <View style={styles.actions}>
-        <TouchableOpacity 
-          style={styles.actionButton} 
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={() => onComment && onComment(post)}
           activeOpacity={0.7}
         >
@@ -96,16 +102,16 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
           <Text style={styles.actionText}>{post?.comments?.length || 0}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.actionButton} 
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={() => onLike && onLike(post?._id)}
           activeOpacity={0.7}
         >
           <View style={[styles.actionIconContainer, isLiked && styles.likedContainer]}>
-            <Ionicons 
-              name={isLiked ? "heart" : "heart-outline"} 
-              size={20} 
-              color={isLiked ? "#F91880" : "#536471"} 
+            <Ionicons
+              name={isLiked ? "heart" : "heart-outline"}
+              size={20}
+              color={isLiked ? "#F91880" : "#536471"}
             />
           </View>
           <Text style={[styles.actionText, isLiked && styles.likedText]}>
@@ -113,14 +119,14 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionButton}
           activeOpacity={0.7}
           onPress={async () => {
             try {
-              const authorName = author?.firstName ? `${author.firstName} ${author.lastName || ''}` : (author?.name || author?.username || 'User');
-              const text = post?.content ? `${authorName}: ${post.content}` : `${authorName} shared a post.`;
-              const url = post?.image || post?.imageUrl || '';
+              const name = author?.firstName ? `${author.firstName} ${author.lastName || ''}` : (author?.name || author?.username || 'User');
+              const text = post?.content ? `${name}: ${post.content}` : `${name} shared a post.`;
+              const url = post?.media?.url || post?.image || post?.imageUrl || '';
               const sharePayload = url ? { message: `${text}\n${url}` } : { message: text };
               await Share.share(sharePayload);
             } catch (err: any) {
@@ -203,12 +209,47 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#0F1419',
   },
+  // full width image for feed (preserve previous aspect ratio)
   postImage: {
     width: width - 32,
     height: (width - 32) * 0.75,
     borderRadius: 16,
     marginBottom: 12,
     backgroundColor: '#EFF3F4',
+  },
+  postContentContainer: {
+    // kept for possible alternate layouts
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  metadataContainer: {
+    marginBottom: 8,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 16,
+  },
+  metadataText: {
+    fontSize: 13,
+    color: '#536471',
+    marginRight: 12,
+  },
+  firstComment: {
+    fontSize: 14,
+    color: '#536471',
+    marginTop: 8,
+    lineHeight: 18,
   },
   actions: {
     flexDirection: 'row',
@@ -233,7 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(249, 24, 128, 0.1)',
   },
   actionText: {
-    marginLeft: 2,
+    marginLeft: 8,
     color: '#536471',
     fontSize: 13,
   },

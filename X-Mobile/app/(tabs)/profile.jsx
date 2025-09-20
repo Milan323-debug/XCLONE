@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import PostComposer from '../../components/PostComposer'
+import ProfilePostCard from '../../components/ProfilePostCard'
 import { useAuthStore } from '../../store/authStore'
 import { API_URL } from '../../constants/api'
 import { COLORS } from '../../constants/colors'
@@ -202,22 +203,13 @@ export default function Profile() {
         ) : (
           <FlatList
             data={posts}
-            keyExtractor={(i) => String(i._1d || i._id || i.id)}
+            keyExtractor={(i) => String(i._id || i.id)}
             renderItem={({ item }) => (
-              <View style={styles.postRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.postContent}>{item.content}</Text>
-                  {(item.image || item.imageUrl || (item.image && item.image.secure_url)) ? (
-                    <Image source={{ uri: item.image || item.imageUrl || (item.image && item.image.secure_url) }} style={styles.postImage} />
-                  ) : null}
-                </View>
-                <TouchableOpacity onPress={() => {
-                  // show same confirm flow
-                  deletePost(item._id || item.id);
-                }} style={styles.deleteBtn} activeOpacity={0.7}>
-                  <Feather name="more-vertical" size={18} color={COLORS.textLight} />
-                </TouchableOpacity>
-              </View>
+              <ProfilePostCard
+                post={item}
+                currentUser={user}
+                onDelete={deletePost}
+              />
             )}
             ListEmptyComponent={<View style={{ padding: 20 }}><Text style={{ color: COLORS.textLight }}>No posts yet.</Text></View>}
             onRefresh={fetchUserPosts}

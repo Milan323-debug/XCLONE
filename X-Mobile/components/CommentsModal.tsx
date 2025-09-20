@@ -95,29 +95,11 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
       // Add the new comment to the list
       setComments((currentComments) => {
         const newComment = json.comment;
+        // ensure replies arrays exist on inserted objects
+        if (!newComment.replies) newComment.replies = [];
 
         if (replyTo) {
-          // For replies, find the parent comment and add the reply to its replies array
-          const found = currentComments.some((c) => c._id === replyTo);
-          if (found) {
-            return currentComments.map((c) => {
-              if (c._id === replyTo) {
-                return {
-                  ...c,
-                  replies: [...(c.replies || []), newComment],
-                };
-              }
-              return c;
-            });
-          }
-
-          // parent not found locally: if server provided parent subtree use it,
-          // otherwise fetch parent subtree as fallback
-          if (json.parent) {
-            setComments((prev) => [json.parent, ...prev]);
-            return currentComments;
-          }
-
+          // Always fetch parent subtree to ensure proper nesting
           (async () => {
             try {
               const r = await fetch(`${API_URL}/api/comments/${replyTo}`);
@@ -125,7 +107,12 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
               const j = await r.json();
               const parent = j.comment;
               if (parent) {
-                setComments((prev) => [parent, ...prev]);
+                if (!parent.replies) parent.replies = [];
+                setComments((prev) => {
+                  const exists = prev.some((c) => String(c._id) === String(parent._id));
+                  if (exists) return prev.map((c) => (String(c._id) === String(parent._id) ? parent : c));
+                  return [parent, ...prev];
+                });
                 return;
               }
             } catch (err) {
@@ -163,7 +150,8 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error('Delete failed');
-          setComments((c) => c.filter((x) => x._id !== commentId));
+          // refresh comments to reflect deletions (including descendants)
+          await fetchComments(1);
           if (typeof onCommentDeleted === 'function') onCommentDeleted();
         } catch (e: any) {
           Alert.alert('Delete failed', e.message || 'Failed to delete comment');
@@ -186,9 +174,13 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
         <View style={styles.postPreview}>
           <Text style={{ color: '#111', fontWeight: '700' }}>{(fetchedPost?.user?.username) || selectedPost.user?.username || 'Unknown'}</Text>
           <Text style={{ color: '#333', marginTop: 6 }}>{fetchedPost?.content ?? selectedPost.content}</Text>
-          {/* show image if available */}
-          {fetchedPost?.image ? (
+          {/* show media (image/video) if available */}
+          {fetchedPost?.media?.url ? (
+            <Image source={{ uri: fetchedPost.media.url }} style={{ width: '100%', height: 180, marginTop: 8, borderRadius: 8 }} />
+          ) : fetchedPost?.image ? (
             <Image source={{ uri: fetchedPost.image }} style={{ width: '100%', height: 180, marginTop: 8, borderRadius: 8 }} />
+          ) : selectedPost?.media?.url ? (
+            <Image source={{ uri: selectedPost.media.url }} style={{ width: '100%', height: 180, marginTop: 8, borderRadius: 8 }} />
           ) : selectedPost.image ? (
             <Image source={{ uri: selectedPost.image }} style={{ width: '100%', height: 180, marginTop: 8, borderRadius: 8 }} />
           ) : null}
@@ -201,6 +193,10 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
         ) : error ? (
           <View style={{ padding: 16 }}>
             <Text style={{ color: '#f00' }}>{error}</Text>
+          </View>
+        ) : (comments.length === 0) ? (
+          <View style={{ padding: 89, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#9ca3af', fontSize: 18, fontStyle: 'italic' }}>It’s quiet here... say something!</Text>
           </View>
         ) : (
           <FlatList
@@ -228,7 +224,7 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                             // optimistic toggle
                             const prev = comments;
                             const uid = currentUser?._id;
-                            setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, likes: Array.isArray(c.likes) ? (isLiked ? c.likes.filter((x: any) => x.toString() !== uid) : [...c.likes, uid]) : [uid] } : c));
+                            setComments((cs) => cs.map((c) => String(c._id) === String(item._id) ? { ...c, likes: Array.isArray(c.likes) ? (isLiked ? c.likes.filter((x: any) => x.toString() !== uid) : [...c.likes, uid]) : [uid] } : c));
                             try {
                               const res = await fetch(`${API_URL}/api/comments/${item._id}/like`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
                               let body: any = {};
@@ -243,7 +239,7 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                                 throw new Error(errMsg);
                               }
                               // success
-                              setComments((cs) => cs.map((c) => c._id === item._id ? (body?.comment ?? c) : c));
+                              setComments((cs) => cs.map((c) => String(c._id) === String(item._id) ? (body?.comment ?? c) : c));
                             } catch (e: any) {
                               console.warn('like error', e.message || e);
                               setComments(prev);
@@ -264,7 +260,7 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                             if (!token || !currentUser) return Alert.alert('Not signed in');
                             const prev = comments;
                             const uid = currentUser?._id;
-                            setComments((cs) => cs.map((c) => c._id === item._id ? { ...c, dislikes: Array.isArray(c.dislikes) ? (c.dislikes.some((d: any) => d.toString() === uid) ? c.dislikes.filter((x: any) => x.toString() !== uid) : [...(c.dislikes || []), uid]) : [uid] } : c));
+                            setComments((cs) => cs.map((c) => String(c._id) === String(item._id) ? { ...c, dislikes: Array.isArray(c.dislikes) ? (c.dislikes.some((d: any) => d.toString() === uid) ? c.dislikes.filter((x: any) => x.toString() !== uid) : [...(c.dislikes || []), uid]) : [uid] } : c));
                             try {
                               const res = await fetch(`${API_URL}/api/comments/${item._id}/dislike`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
                               let body: any = {};
@@ -278,7 +274,7 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
                                 const errMsg = body?.error || body?.message || `Status ${res.status}`;
                                 throw new Error(errMsg);
                               }
-                              setComments((cs) => cs.map((c) => c._id === item._id ? (body?.comment ?? c) : c));
+                              setComments((cs) => cs.map((c) => String(c._id) === String(item._id) ? (body?.comment ?? c) : c));
                             } catch (e: any) {
                               console.warn('dislike error', e.message || e);
                               setComments(prev);

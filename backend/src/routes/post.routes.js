@@ -18,7 +18,8 @@ router.get("/user/:username", getUserPosts);
 router.get("/:postId", getPost);
 
 // protected proteced
-router.post("/", protectRoute, upload.single("image"), createPost);
+// accept a single file under field name 'media' (image or video)
+router.post("/", protectRoute, upload.single("media"), createPost);
 router.post("/:postId/like", protectRoute, likePost);
 router.delete("/:postId", protectRoute, deletePost);
 

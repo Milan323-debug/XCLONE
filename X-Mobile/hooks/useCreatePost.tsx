@@ -10,25 +10,22 @@ export const useCreatePost = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  const sendCreatePost = async (postData: { content: string; imageUri?: string }) => {
+  const sendCreatePost = async (postData: { content: string; mediaUri?: string; mediaType?: string }) => {
     setIsCreating(true);
     try {
       const formData = new FormData();
       if (postData.content) formData.append("content", postData.content);
 
-      if (postData.imageUri) {
-        const uriParts = postData.imageUri.split(".");
+      if (postData.mediaUri) {
+        // infer file extension
+        const uriParts = postData.mediaUri.split(".");
         const fileType = uriParts[uriParts.length - 1].toLowerCase();
-        const mimeTypeMap: { [k: string]: string } = {
-          png: "image/png",
-          gif: "image/gif",
-          webp: "image/webp",
-        };
-        const mimeType = mimeTypeMap[fileType] || "image/jpeg";
+        const isVideo = (postData.mediaType || "").startsWith("video") || ["mp4", "mov", "mkv"].includes(fileType);
+        const mimeType = postData.mediaType || (isVideo ? `video/${fileType}` : `image/${fileType}`);
 
-        formData.append("image", {
-          uri: postData.imageUri,
-          name: `image.${fileType}`,
+        formData.append("media", {
+          uri: postData.mediaUri,
+          name: `media.${fileType}`,
           type: mimeType,
         } as any);
       }
@@ -86,7 +83,7 @@ export const useCreatePost = () => {
       quality: 0.6, // Reduced quality for better performance
       exif: false, // Don't need EXIF data
       base64: false, // Don't need base64
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
     };
 
     const result = useCamera
@@ -94,18 +91,21 @@ export const useCreatePost = () => {
       : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
     if (!(result as any).canceled && (result as any).assets?.[0]) {
-      setSelectedImage((result as any).assets[0].uri);
+      const asset = (result as any).assets[0];
+      // set selectedImage to uri; we also store media type by encoding into a tuple string 'uri||type'
+      // but here we'll keep selectedImage as uri and rely on mime detection later
+      setSelectedImage(asset.uri);
     }
   };
 
   const createPost = () => {
     if (!content.trim() && !selectedImage) {
-      Alert.alert("Empty Post", "Please write something or add an image before posting!");
+      Alert.alert("Empty Post", "Please write something or add media before posting!");
       return;
     }
 
-    const postData: { content: string; imageUri?: string } = { content: content.trim() };
-    if (selectedImage) postData.imageUri = selectedImage;
+    const postData: { content: string; mediaUri?: string; mediaType?: string } = { content: content.trim() };
+    if (selectedImage) postData.mediaUri = selectedImage;
     void sendCreatePost(postData);
   };
 

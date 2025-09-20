@@ -3,6 +3,7 @@ import { useCreatePost } from "../hooks/useCreatePost";
 import { useAuthStore } from "../store/authStore";
 import { Feather } from "@expo/vector-icons";
 import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { Video } from "expo-av";
 
 const PostComposer = () => {
   const {
@@ -38,11 +39,22 @@ const PostComposer = () => {
       {selectedImage && (
         <View style={styles.previewWrap}>
           <View>
-            <Image
-              source={{ uri: selectedImage }}
-              style={styles.preview}
-              resizeMode="cover"
-            />
+            {/* rudimentary mime check to decide image vs video preview */}
+            {selectedImage.match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i) ? (
+              <Video
+                source={{ uri: selectedImage }}
+                style={styles.preview}
+                useNativeControls
+                isLooping
+              />
+            ) : (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.preview}
+                resizeMode="cover"
+              />
+            )}
+
             <TouchableOpacity style={styles.removeBtn} onPress={removeImage}>
               <Feather name="x" size={16} color="white" />
             </TouchableOpacity>

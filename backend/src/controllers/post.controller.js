@@ -64,46 +64,63 @@ export const createPost = asyncHandler(async (req, res) => {
   // req.user is set by protectRoute middleware
   const userFromReq = req.user;
   const { content } = req.body;
-  const imageFile = req.file;
+  const mediaFile = req.file;
 
-  if (!content && !imageFile) {
-    return res.status(400).json({ error: "Post must contain either text or image" });
+  if (!content && !mediaFile) {
+    return res.status(400).json({ error: "Post must contain either text or media" });
   }
 
   const user = userFromReq;
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  let imageUrl = "";
+  let media = { type: "image", url: "", poster: "" };
 
-  // upload image to Cloudinary if provided
-  if (imageFile) {
+  // upload media (image or video) to Cloudinary if provided
+  if (mediaFile) {
     try {
       // convert buffer to base64 for cloudinary
-      const base64Image = `data:${imageFile.mimetype};base64,${imageFile.buffer.toString(
+      const base64Data = `data:${mediaFile.mimetype};base64,${mediaFile.buffer.toString(
         "base64"
       )}`;
 
-      const uploadResponse = await cloudinary.uploader.upload(base64Image, {
+      // choose resource_type based on mimetype
+      const isVideo = mediaFile.mimetype.startsWith("video/");
+
+      const uploadOptions = {
         folder: "social_media_posts",
-        resource_type: "image",
+        resource_type: isVideo ? "video" : "image",
         transformation: [
-          { width: 800, height: 600, crop: "limit" },
           { quality: "auto" },
           { format: "auto" },
         ],
-      });
-  console.log('Cloudinary upload response:', uploadResponse && uploadResponse.secure_url ? uploadResponse.secure_url : uploadResponse);
-      imageUrl = uploadResponse.secure_url;
+      };
+
+      // for images, apply size limit; for videos allow original
+      if (!isVideo) {
+        uploadOptions.transformation.unshift({ width: 800, height: 600, crop: "limit" });
+      }
+
+      const uploadResponse = await cloudinary.uploader.upload(base64Data, uploadOptions);
+      console.log('Cloudinary upload response:', uploadResponse && uploadResponse.secure_url ? uploadResponse.secure_url : uploadResponse);
+
+      media.type = isVideo ? "video" : "image";
+      // for videos Cloudinary may return secure_url or a different field; secure_url works for both
+      media.url = uploadResponse.secure_url || uploadResponse.url || "";
+
+      // if video, try to get a poster/thumbnail
+      if (isVideo && uploadResponse && uploadResponse.thumbnail_url) {
+        media.poster = uploadResponse.thumbnail_url;
+      }
     } catch (uploadError) {
       console.error("Cloudinary upload error:", uploadError);
-      return res.status(400).json({ error: "Failed to upload image" });
+      return res.status(400).json({ error: "Failed to upload media" });
     }
   }
 
   const post = await Post.create({
     user: user._id,
     content: content || "",
-    image: imageUrl,
+    media,
   });
 
   res.status(201).json({ post });
