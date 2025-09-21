@@ -46,8 +46,13 @@ export default function Profile() {
     if (!token || !user) return
     setLoading(true)
     try {
+      console.debug('fetchProfile: token present?', !!token, 'user id=', user?._id)
       const res = await fetch(`${API_URL}/api/user/me`, { headers: { Authorization: `Bearer ${token}` } })
-      if (!res.ok) throw new Error('Failed to load profile')
+      if (!res.ok) {
+        const body = await res.text().catch(() => '<no body>');
+        console.warn('fetchProfile (me) failed', res.status, body);
+        throw new Error(`Failed to load profile: ${res.status} ${body}`)
+      }
       const json = await res.json()
       setProfileUser(json.user || user)
     } catch (e) {

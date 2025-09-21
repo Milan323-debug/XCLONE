@@ -8,7 +8,9 @@ import Notification from '../models/notification.model.js';
 export const getCurrentUser = asyncHandler(async (req, res) => {
 	const user = req.user;
 	if (!user) return res.status(401).json({ message: 'Not authenticated' });
-	res.status(200).json({ user });
+	// return a plain object to avoid possible Mongoose document serialization issues
+	const safeUser = (user && typeof user.toObject === 'function') ? user.toObject() : user;
+	res.status(200).json({ user: safeUser });
 });
 
 // Get public profile by username
