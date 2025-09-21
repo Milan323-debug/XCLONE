@@ -39,10 +39,11 @@ export const useCreatePost = () => {
               
               console.log(`Preparing video upload. Size: ${(fileSize / (1024 * 1024)).toFixed(2)}MB`);
               
-              if (fileSize > 50 * 1024 * 1024) { // 50MB limit
+              const maxSize = 25; // 25MB limit
+              if (fileSize > maxSize * 1024 * 1024) {
                 Alert.alert(
                   'Video Too Large',
-                  'Please select a video smaller than 50MB',
+                  `Please select a video smaller than ${maxSize}MB or use a lower quality setting. Try reducing the video length or resolution.`,
                   [{ text: 'OK' }]
                 );
                 throw new Error('Video file too large');
@@ -124,10 +125,11 @@ export const useCreatePost = () => {
           
           console.log(`Starting video upload... File size: ${fileSizeMB.toFixed(2)}MB`);
           
-          if (fileSizeMB > 100) {
+          const maxSize = 25; // 25MB limit
+          if (fileSizeMB > maxSize) {
             Alert.alert(
               'Video Too Large',
-              'The video file is too large. Maximum size is 100MB.',
+              `The video file is too large. Maximum size is ${maxSize}MB. Try these tips:\n- Record a shorter video\n- Use a lower video quality\n- Reduce the video resolution`,
               [{ text: 'OK' }]
             );
             throw new Error('Video file too large');
@@ -259,19 +261,22 @@ export const useCreatePost = () => {
       return;
     }
 
-    const pickerOptions: any = {
+    const pickerOptions: ImagePicker.ImagePickerOptions = {
       allowsEditing: true,
-      aspect: [16, 9] as [number, number],
-      quality: mediaKind === 'video' ? 0.7 : 0.8, // Better quality for videos
+      aspect: undefined, // Allow free aspect ratio for all media
+      quality: mediaKind === 'video' ? 0.3 : 0.6, // Lower quality to meet size limits
       exif: false,
-      base64: false,
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      videoMaxDuration: 180, // Allow up to 3 minutes
-      duration: 180,
-      // Allow higher quality video
-      videoQuality: Platform.OS === 'ios' 
-        ? ImagePicker.UIImagePickerControllerQualityType.High
-        : 'high',
+      mediaTypes: mediaKind === 'video' ? ImagePicker.MediaTypeOptions.Videos : 
+                 mediaKind === 'image' ? ImagePicker.MediaTypeOptions.Images :
+                 ImagePicker.MediaTypeOptions.All,
+      videoMaxDuration: 30, // Limit to 30 seconds to help control file size
+      allowsMultipleSelection: false,
+      // Set video quality
+      ...(Platform.OS === 'ios' ? {
+        videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium
+      } : {
+        quality: 0.3 // Lower quality for Android
+      })
     };
 
     if (mediaKind === 'image') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Images;
@@ -285,14 +290,18 @@ export const useCreatePost = () => {
       const asset = (result as any).assets[0];
       
       // Check file size for videos
-      if (asset.fileSize && (asset.type?.startsWith('video') || asset.uri.match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i))) {
+      // Check file size for all media types
+      if (asset.fileSize) {
         const sizeMB = asset.fileSize / (1024 * 1024);
-        console.log(`Video size: ${sizeMB.toFixed(2)}MB`);
+        const isVideo = asset.type?.startsWith('video') || asset.uri.match(/\.(mp4|mov|mkv|webm|3gp)(\?|$)/i);
+        const maxSize = 4; // 4MB limit to match Vercel's free tier limit
         
-        if (sizeMB > 10) { // Limit to 10MB
+        console.log(`${isVideo ? 'Video' : 'Image'} size: ${sizeMB.toFixed(2)}MB`);
+        
+        if (sizeMB > maxSize) {
           Alert.alert(
-            'Video Too Large',
-            'Please select a shorter video or use a lower quality setting. Maximum size is 10MB.',
+            'File Too Large',
+            `Please select a ${isVideo ? 'shorter video or use a lower quality setting' : 'smaller image'}. Maximum size is ${maxSize}MB.`,
             [{ text: 'OK' }]
           );
           return;

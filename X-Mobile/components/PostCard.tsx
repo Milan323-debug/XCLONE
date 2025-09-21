@@ -1,22 +1,27 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Alert, Share } from 'react-native';
-import { Video } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { formatRelativeTime } from '../lib/timeUtils';
 
-type Props = {
-  post?: any;
+import type { Post, User, PostWithCommentUpdate } from '../types';
+
+interface Props {
+  post?: Post;
   onLike?: (postId: string) => void;
   onDelete?: (postId: string) => Promise<void> | void;
-  onComment?: (post: any) => void;
-  currentUser?: any;
+  onComment?: (post: PostWithCommentUpdate) => void;
+  currentUser?: User;
   isLiked?: boolean;
-};
+}
 
 const { width } = Dimensions.get('window');
 
 const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentUser, isLiked }) => {
-  const author = React.useMemo(() => post?.user || post?.userId || {}, [post]);
+    const videoRef = React.useRef<Video | null>(null);
+  const [commentCount, setCommentCount] = React.useState(post?.comments?.length || 0);
+  // author may be a User object or just an id/ref; narrow to a loose object shape for local use
+  const author: any = React.useMemo(() => post?.user || post?.userId || {}, [post]);
   const isOwner = React.useMemo(() => currentUser?._id === (author?._id || author?.id || author?._ref), [currentUser?._id, author]);
   const formattedDate = React.useMemo(() => post?.createdAt ? formatRelativeTime(post.createdAt) : '', [post?.createdAt]);
 
@@ -32,12 +37,28 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
 
   const profileImageUri = React.useMemo(() => {
     const fallbackUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`;
-    return author?.profileImage || author?.profileImage?.secure_url || author?.avatar || fallbackUri;
+    if (!author) return fallbackUri;
+    if (typeof author.profileImage === 'string') return author.profileImage;
+    if (author.profileImage && typeof author.profileImage === 'object' && author.profileImage.secure_url) return author.profileImage.secure_url;
+    if (author?.avatar && typeof author.avatar === 'string') return author.avatar;
+    return fallbackUri;
   }, [author, authorName]);
 
   // support legacy posts that used `image` or `imageUrl` and new `media` object
-  const mediaUrl = React.useMemo(() => post?.media?.url || post?.image || post?.imageUrl || '', [post]);
-  const mediaType = React.useMemo(() => post?.media?.type || (post?.image || post?.imageUrl ? 'image' : undefined), [post]);
+  const mediaUrl = React.useMemo(() => {
+    if (!post) return '';
+    if (post.media && post.media.url) return post.media.url;
+    if (typeof post.image === 'string') return post.image;
+    if (post.image && typeof post.image === 'object' && post.image.secure_url) return post.image.secure_url;
+    if (post.imageUrl) return post.imageUrl;
+    return '';
+  }, [post]);
+
+  const mediaType = React.useMemo(() => {
+    if (post?.media?.type) return post.media.type;
+    if (post?.image || post?.imageUrl) return 'image';
+    return undefined;
+  }, [post]);
 
   return (
     <View style={styles.container}>
@@ -61,7 +82,9 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
             onPress={() => {
               Alert.alert('Are you sure you want to delete this post?', undefined, [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => onDelete && onDelete(post?._id) }
+                { text: 'Delete', style: 'destructive', onPress: () => {
+                  if (onDelete && typeof post?._id === 'string') onDelete(post._id);
+                } }
               ])
             }}
             style={styles.deleteButton}
@@ -78,12 +101,41 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
       {/* render media (image/video) if available; fall back to legacy fields */}
       {mediaUrl ? (
         mediaType === 'video' ? (
-          <Video
-            source={{ uri: mediaUrl }}
-            style={styles.postImage}
-            useNativeControls
-            isLooping
-          />
+          <View style={styles.videoContainer}>
+            <View style={styles.mediaCrop}>
+              {/* show poster image if available for video */}
+              {post?.media?.poster ? (
+                <Image source={{ uri: post?.media?.poster }} style={styles.postImage} resizeMode="cover" />
+              ) : null}
+              <Video
+                ref={videoRef}
+                source={{ uri: mediaUrl }}
+                style={[styles.postImage]}
+                useNativeControls
+                resizeMode={ResizeMode.COVER}
+                isLooping
+                shouldPlay={false}
+                onFullscreenUpdate={({ fullscreenUpdate }) => {
+                  // Handle fullscreen updates if needed
+                  console.log('Fullscreen update:', fullscreenUpdate);
+                }}
+              />
+            </View>
+            <TouchableOpacity 
+              style={styles.fullscreenButton}
+              onPress={async () => {
+                try {
+                  if (videoRef.current) {
+                    await videoRef.current.presentFullscreenPlayer();
+                  }
+                } catch (error) {
+                  console.error('Error presenting fullscreen:', error);
+                }
+              }}
+            >
+              <Ionicons name="expand-outline" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
         ) : (
           <Image
             source={{ uri: mediaUrl }}
@@ -99,18 +151,29 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => onComment && onComment(post)}
+          onPress={() => {
+            if (post?._id && onComment) {
+              const payload: PostWithCommentUpdate = {
+                ...post,
+                comments: post?.comments || [],
+                onCommentUpdate: ({ newCount }: { newCount: number }) => {
+                  setCommentCount(newCount);
+                }
+              } as PostWithCommentUpdate;
+              onComment(payload);
+            }
+          }}
           activeOpacity={0.7}
         >
           <View style={styles.actionIconContainer}>
             <Ionicons name="chatbubble-outline" size={20} color="#536471" />
           </View>
-          <Text style={styles.actionText}>{post?.comments?.length || 0}</Text>
+          <Text style={styles.actionText}>{commentCount}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => onLike && onLike(post?._id)}
+          onPress={() => post?._id && onLike?.(post._id)}
           activeOpacity={0.7}
         >
           <View style={[styles.actionIconContainer, isLiked && styles.likedContainer]}>
@@ -135,8 +198,9 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
               const url = post?.media?.url || post?.image || post?.imageUrl || '';
               const sharePayload = url ? { message: `${text}\n${url}` } : { message: text };
               await Share.share(sharePayload);
-            } catch (err: any) {
-              Alert.alert('Share failed', err?.message || 'Could not share post');
+            } catch (err) {
+              const message = (err && (err as any).message) || 'Could not share post';
+              Alert.alert('Share failed', message);
             }
           }}
         >
@@ -215,13 +279,38 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#0F1419',
   },
-  // full width image for feed (preserve previous aspect ratio)
+  // full width image/video for feed with flexible aspect ratio
   postImage: {
+    width: width - 32,
+    // increase vertical size slightly (taller cards)
+    minHeight: (width - 32) * 0.75, // taller minimum (approx 4:3)
+    maxHeight: (width - 32) * 1.2, // cap height for tall media
+    borderRadius: 16,
+    marginBottom: 12,
+    backgroundColor: '#000',
+  },
+  // container to crop videos when using cover to fill horizontally
+  mediaCrop: {
     width: width - 32,
     height: (width - 32) * 0.75,
     borderRadius: 16,
+    overflow: 'hidden',
     marginBottom: 12,
-    backgroundColor: '#EFF3F4',
+    backgroundColor: '#000',
+  },
+  videoContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreenButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+    zIndex: 1,
   },
   postContentContainer: {
     // kept for possible alternate layouts

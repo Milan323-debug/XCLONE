@@ -1,10 +1,13 @@
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { usePosts } from "../hooks/usePosts";
-import { Post } from "../types";
+import { Post, PostWithCommentUpdate } from "../types";
 import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet, FlatList } from "react-native";
 import PostCard from "./PostCard";
-import { useState, useCallback, memo } from "react";
+import React from "react";
+import { useState, useCallback } from "react";
 import CommentsModal from "./CommentsModal";
+
+// ...existing code...
 
 interface PostsListProps {
   username?: string;
@@ -18,15 +21,17 @@ const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
     usePosts(username);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
-  const selectedPost = selectedPostId ? posts.find((p: Post) => p._id === selectedPostId) : null;
+  // typed as PostWithCommentUpdate when available so calling onCommentUpdate is type-safe
+  const selectedPost = selectedPostId ? (posts.find((p: Post) => p._id === selectedPostId) as PostWithCommentUpdate | undefined) : undefined;
 
+  const MemoPostCard = React.memo(PostCard);
   const renderItem = useCallback(({ item: post }: { item: Post }) => (
-    <PostCard
+    <MemoPostCard
       key={post._id}
       post={post}
       onLike={toggleLike}
       onDelete={deletePost}
-      onComment={(post: Post) => setSelectedPostId(post._id)}
+      onComment={(post: PostWithCommentUpdate) => setSelectedPostId(post._id)}
       currentUser={currentUser}
       isLiked={checkIsLiked(post.likes, currentUser)}
     />
@@ -90,8 +95,16 @@ const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
       <CommentsModal
         selectedPost={selectedPost}
         onClose={() => setSelectedPostId(null)}
-        onCommentCreated={() => refetch()}
-        onCommentDeleted={() => refetch()}
+        onCommentCreated={update => {
+          if (selectedPost?.onCommentUpdate) {
+            selectedPost.onCommentUpdate({ newCount: update.newCount });
+          }
+        }}
+        onCommentDeleted={update => {
+          if (selectedPost?.onCommentUpdate) {
+            selectedPost.onCommentUpdate({ newCount: update.newCount });
+          }
+        }}
       />
     </>
   );

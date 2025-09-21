@@ -17,7 +17,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fileSize: 4 * 1024 * 1024, // 4MB limit to stay within Vercel's free tier limit
     files: 1 // Only allow 1 file per request
   },
 });

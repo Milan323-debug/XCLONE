@@ -15,7 +15,8 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["follow", "like", "comment"],
+      // extend enum to include reply and like_comment which are created by comment controllers
+      enum: ["follow", "like", "comment", "reply", "like_comment"],
     },
     post: {
       type: mongoose.Schema.Types.ObjectId,

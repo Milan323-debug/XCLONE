@@ -4,7 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../constants/api';
 import { useAuthStore } from '../store/authStore';
 
-const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDeleted }: { selectedPost?: any; onClose?: () => void, onCommentCreated?: () => void, onCommentDeleted?: () => void }) => {
+interface CommentsModalProps {
+  selectedPost?: any;
+  onClose?: () => void;
+  onCommentCreated?: (update: { postId: string; newCount: number }) => void;
+  onCommentDeleted?: (update: { postId: string; newCount: number }) => void;
+}
+
+const CommentsModal: React.FC<CommentsModalProps> = ({ selectedPost, onClose, onCommentCreated, onCommentDeleted }) => {
   const [comments, setComments] = useState<any[]>([]);
   const [fetchedPost, setFetchedPost] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -94,9 +101,12 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
 
       // Add the new comment to the list
       setComments((currentComments) => {
-        const newComment = json.comment;
-        // ensure replies arrays exist on inserted objects
-        if (!newComment.replies) newComment.replies = [];
+        const newComment = {
+          ...json.comment,
+          user: currentUser, // Add current user info for immediate display
+          replies: [], // Initialize empty replies array
+          createdAt: new Date().toISOString() // Add current timestamp
+        };
 
         if (replyTo) {
           // Always fetch parent subtree to ensure proper nesting
@@ -128,10 +138,15 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
         return [newComment, ...currentComments];
       });
 
-      // Clear reply state when posted
+      // Update UI optimistically
       setReplyTo(null);
-      if (typeof onCommentCreated === 'function') onCommentCreated();
       setText('');
+      
+      // Update parent post's comment count without triggering a refetch
+      if (typeof onCommentCreated === 'function') {
+        const newCommentCount = (selectedPost.comments?.length || 0) + 1;
+        onCommentCreated({ postId: selectedPost._id, newCount: newCommentCount });
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Could not post comment');
     } finally {
@@ -150,9 +165,15 @@ const CommentsModal = ({ selectedPost, onClose, onCommentCreated, onCommentDelet
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error('Delete failed');
-          // refresh comments to reflect deletions (including descendants)
-          await fetchComments(1);
-          if (typeof onCommentDeleted === 'function') onCommentDeleted();
+          
+          // Update UI optimistically without fetching
+          setComments(prev => prev.filter(c => c._id !== commentId));
+          
+          // Notify parent about the update
+          if (typeof onCommentDeleted === 'function') {
+            const newCommentCount = Math.max(0, (selectedPost.comments?.length || 1) - 1);
+            onCommentDeleted({ postId: selectedPost._id, newCount: newCommentCount });
+          }
         } catch (e: any) {
           Alert.alert('Delete failed', e.message || 'Failed to delete comment');
         }

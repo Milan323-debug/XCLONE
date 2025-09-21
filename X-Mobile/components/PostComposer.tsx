@@ -76,9 +76,9 @@ const PostComposer = () => {
           <TouchableOpacity style={styles.iconBtn} onPress={takePhoto} accessibilityLabel="Take photo">
             <Feather name="camera" size={20} color="#1DA1F2" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={recordVideo} accessibilityLabel="Record video">
+          {/* <TouchableOpacity style={styles.iconBtn} onPress={recordVideo} accessibilityLabel="Record video">
             <Feather name="video" size={20} color="#0ea5e9" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <View style={styles.rightArea}>

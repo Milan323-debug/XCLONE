@@ -1,19 +1,74 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-const NoNotificationsFound = ({ onRefresh }: { onRefresh?: () => void }) => {
+interface NoNotificationsFoundProps {
+  onRefresh?: () => void;
+}
+
+const NoNotificationsFound: React.FC<NoNotificationsFoundProps> = ({ onRefresh }) => {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/1827/1827504.png' }} style={{ width: 120, height: 120, marginBottom: 16, opacity: 0.6 }} />
-      <Text style={{ fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 8 }}>No notifications</Text>
-      <Text style={{ color: '#6b7280', textAlign: 'center', marginBottom: 12 }}>You're all caught up — we'll let you know when something happens.</Text>
-      {onRefresh ? (
-        <TouchableOpacity onPress={onRefresh} style={{ backgroundColor: '#eef2ff', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 }}>
-          <Text style={{ color: '#1f2937' }}>Refresh</Text>
+    <View style={styles.container}>
+      <View style={styles.iconContainer}>
+        <Ionicons name="notifications-outline" size={48} color="#94a3b8" />
+      </View>
+      <Text style={styles.title}>No notifications</Text>
+      <Text style={styles.description}>
+        You're all caught up — we'll let you know when something happens.
+      </Text>
+      {onRefresh && (
+        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+          <Ionicons name="refresh" size={20} color="#4b5563" style={styles.refreshIcon} />
+          <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>
-      ) : null}
+      )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  iconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 8,
+  },
+  description: {
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 9999,
+  },
+  refreshIcon: {
+    marginRight: 8,
+  },
+  refreshText: {
+    color: '#4b5563',
+    fontWeight: '600',
+  },
+});
 
 export default NoNotificationsFound;

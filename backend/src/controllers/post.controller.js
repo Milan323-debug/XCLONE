@@ -98,6 +98,16 @@ export const createPost = asyncHandler(async (req, res) => {
       // for images, apply size limit; for videos allow original
       if (!isVideo) {
         uploadOptions.transformation.unshift({ width: 800, height: 600, crop: "limit" });
+      } else {
+        // For videos, request an eager-derived jpg thumbnail (poster) at 1s offset
+        uploadOptions.eager = [
+          {
+            resource_type: 'video',
+            format: 'jpg',
+            start_offset: '1',
+            transformation: [{ width: 800, height: 600, crop: 'fill', gravity: 'center' }],
+          },
+        ];
       }
 
       const uploadResponse = await cloudinary.uploader.upload(base64Data, uploadOptions);
@@ -107,9 +117,26 @@ export const createPost = asyncHandler(async (req, res) => {
       // for videos Cloudinary may return secure_url or a different field; secure_url works for both
       media.url = uploadResponse.secure_url || uploadResponse.url || "";
 
-      // if video, try to get a poster/thumbnail
-      if (isVideo && uploadResponse && uploadResponse.thumbnail_url) {
-        media.poster = uploadResponse.thumbnail_url;
+      // if video, try to get a poster/thumbnail from eager result, or thumbnail_url, or generate a URL
+      if (isVideo && uploadResponse) {
+        // eager[0] is the derived image if Cloudinary produced it
+        if (Array.isArray(uploadResponse.eager) && uploadResponse.eager[0] && uploadResponse.eager[0].secure_url) {
+          media.poster = uploadResponse.eager[0].secure_url;
+        } else if (uploadResponse.thumbnail_url) {
+          media.poster = uploadResponse.thumbnail_url;
+        } else if (uploadResponse.public_id) {
+          // fallback: construct a video frame URL (Cloudinary will serve a jpg frame)
+          try {
+            media.poster = cloudinary.url(uploadResponse.public_id, {
+              resource_type: 'video',
+              format: 'jpg',
+              start_offset: '1',
+              secure: true,
+            });
+          } catch (e) {
+            console.warn('Failed to construct poster URL from public_id', e);
+          }
+        }
       }
     } catch (uploadError) {
       console.error("Cloudinary upload error:", uploadError);

@@ -71,8 +71,7 @@ export const usePosts = (username?: string) => {
         headers: t ? { Authorization: `Bearer ${t}` } : {},
       });
       if (!res.ok) throw new Error('Failed to toggle like');
-      // optionally refresh from server to get exact counts
-      await fetchPosts();
+      // Success - no need to refetch
     } catch (err) {
       console.error('toggleLike error', err);
       // revert optimistic update on error
@@ -115,7 +114,25 @@ export const usePosts = (username?: string) => {
     return likes && likes.some((l: any) => l.toString() === user._id?.toString());
   };
 
-  return { posts, isLoading, error, refetch, toggleLike, deletePost, checkIsLiked };
+  const updatePostLocally = (postId: string, updates: Partial<any>) => {
+    setPosts((ps) =>
+      ps.map((p) => {
+        if ((p._id || p.id) !== postId) return p;
+        return { ...p, ...updates };
+      })
+    );
+  };
+
+  return { 
+    posts, 
+    isLoading, 
+    error, 
+    refetch, 
+    toggleLike, 
+    deletePost,
+    updatePostLocally,
+    checkIsLiked
+  };
 };
 
 export default usePosts;

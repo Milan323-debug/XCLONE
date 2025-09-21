@@ -9,7 +9,7 @@ export const getNotifications = asyncHandler(async (req, res) => {
   const notifications = await Notification.find({ to: user._id })
     .sort({ createdAt: -1 })
     .populate("from", "username firstName lastName profileImage")
-    .populate("post", "content image")
+    .populate("post", "content image media")
     .populate("comment", "content");
 
   res.status(200).json({ notifications });

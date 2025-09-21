@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { API_URL } from '../constants/api';
 import { useAuthStore } from '../store/authStore';
+import { Notification } from '../types/notification';
 
 export const useNotifications = () => {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [isRefetching, setIsRefetching] = useState(false);
   const token = useAuthStore((s) => s.token);
 
@@ -18,7 +19,7 @@ export const useNotifications = () => {
       const json = await res.json();
       setNotifications(json.notifications || []);
     } catch (e) {
-      setError(e);
+      setError(e instanceof Error ? e : new Error('Failed to load notifications'));
     } finally {
       setIsLoading(false);
     }
