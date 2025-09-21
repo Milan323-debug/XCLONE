@@ -33,10 +33,18 @@ export const getUserById = asyncHandler(async (req, res) => {
 // Batch fetch users by array of ids
 export const getUsersBatch = asyncHandler(async (req, res) => {
 	const { ids } = req.body || {};
-	if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'Invalid ids' });
-	// ensure valid ObjectId strings
-	const users = await User.find({ _id: { $in: ids } }).select('-password');
-	res.status(200).json({ users });
+	console.log('getUsersBatch: received ids count=', Array.isArray(ids) ? ids.length : typeof ids);
+	if (!Array.isArray(ids) || ids.length === 0) {
+		// return empty list (frontend can handle) instead of error to avoid noisy warnings
+		return res.status(200).json({ users: [] });
+	}
+	try {
+		const users = await User.find({ _id: { $in: ids } }).select('-password');
+		return res.status(200).json({ users });
+	} catch (e) {
+		console.error('getUsersBatch: error fetching users', e);
+		return res.status(500).json({ message: 'Failed to fetch users', users: [] });
+	}
 });
 
 // Sync user (placeholder - ensure user exists / create minimal record)

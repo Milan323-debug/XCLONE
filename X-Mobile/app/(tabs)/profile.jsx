@@ -84,20 +84,27 @@ export default function Profile() {
       const needFetch = list.length > 0 && typeof list[0] !== 'object';
       if (needFetch) {
         try {
+          console.debug('openListModal: fetching batch for ids count=', list.length);
           const res = await fetch(`${API_URL}/api/user/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: list }),
           });
-          if (res.ok) {
-            const j = await res.json();
+          const text = await res.text();
+          let j = null;
+          try { j = text ? JSON.parse(text) : null; } catch(e) { console.debug('openListModal: batch response not json', text); }
+          if (res.ok && j && Array.isArray(j.users)) {
             setListUsers(j.users || []);
           } else {
-            setListUsers([]);
+            console.warn('openListModal: batch fetch failed', res.status, text);
+            // fallback: show placeholder objects so user sees something
+            const placeholders = list.map(id => ({ _id: id, username: id.substring(0, 8), profileImage: 'https://i.pravatar.cc/48' }));
+            setListUsers(placeholders);
           }
         } catch (e) {
           console.warn('batch fetch error', e);
-          setListUsers([]);
+          const placeholders = list.map(id => ({ _id: id, username: id.substring(0, 8), profileImage: 'https://i.pravatar.cc/48' }));
+          setListUsers(placeholders);
         }
       } else {
         setListUsers(list || []);
