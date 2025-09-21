@@ -1,4 +1,5 @@
 import asyncHandler from 'express-async-handler';
+import mongoose from 'mongoose';
 import User from '../models/user.model.js';
 import cloudinary from '../config/cloudinary.js';
 import Notification from '../models/notification.model.js';
@@ -130,27 +131,75 @@ export const followUser = asyncHandler(async (req, res) => {
 	const targetUser = await User.findById(targetUserId);
 	if (!targetUser) return res.status(404).json({ message: 'Target user not found' });
 
+	console.log(`followUser: actor=${currentUser._id.toString()} target=${targetUserId}`);
+
 	// determine current following state
-	const isFollowing = targetUser.followers.some((f) => f.toString() === currentUser._id.toString());
+	const isFollowing = (targetUser.followers || []).some((f) => f.toString() === currentUser._id.toString());
+	console.log('followUser: initial isFollowing=', isFollowing);
 
 	if (isFollowing) {
-		// unfollow using atomic $pull to avoid races
-		await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUser._id } });
-		await User.findByIdAndUpdate(currentUser._id, { $pull: { following: targetUser._id } });
-
-		// optional: remove follow notification (not strictly necessary)
-		await Notification.deleteMany({ from: currentUser._id, to: targetUser._id, type: 'follow' }).catch(() => {});
-
-		// fetch updated counts
-		const updatedTarget = await User.findById(targetUserId).select('followers');
-		const updatedCurrent = await User.findById(currentUser._id).select('following');
-
-		return res.status(200).json({ message: 'Unfollowed user', isFollowing: false, followersCount: updatedTarget.followers.length, followingCount: updatedCurrent.following.length });
+		// Try to perform both updates in a transaction for atomicity when supported
+		let updatedTarget, updatedCurrent;
+		try {
+			const session = await mongoose.startSession();
+			try {
+				await session.withTransaction(async () => {
+					updatedTarget = await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUser._id } }, { new: true, session }).select('followers');
+					updatedCurrent = await User.findByIdAndUpdate(currentUser._id, { $pull: { following: targetUser._id } }, { new: true, session }).select('following');
+					await Notification.deleteMany({ from: currentUser._id, to: targetUser._id, type: 'follow' }).session(session).catch(() => {});
+				});
+			} finally {
+				session.endSession();
+			}
+		} catch (txErr) {
+			// Transactions may not be supported (standalone mongod); fall back to non-transactional updates
+			console.warn('followUser: transactions not available, falling back', txErr.message || txErr);
+			try {
+				[updatedTarget, updatedCurrent] = await Promise.all([
+					User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUser._id } }, { new: true }).select('followers'),
+					User.findByIdAndUpdate(currentUser._id, { $pull: { following: targetUser._id } }, { new: true }).select('following'),
+				]);
+				await Notification.deleteMany({ from: currentUser._id, to: targetUser._id, type: 'follow' }).catch(() => {});
+			} catch (err) {
+				console.error('followUser: error during unfollow fallback updates', err);
+				return res.status(500).json({ message: 'Failed to unfollow user' });
+			}
+		}
+		console.log(`followUser: unfollow completed targetFollowers=${(updatedTarget.followers || []).length} currentFollowing=${(updatedCurrent.following || []).length}`);
+		return res.status(200).json({ message: 'Unfollowed user', isFollowing: false, followersCount: (updatedTarget.followers || []).length, followingCount: (updatedCurrent.following || []).length });
 	}
 
 	// follow using atomic $addToSet to prevent duplicates
-	await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUser._id } });
-	await User.findByIdAndUpdate(currentUser._id, { $addToSet: { following: targetUser._id } });
+	// Try to perform both updates in a transaction for atomicity when supported
+	let updatedTarget2, updatedCurrent2;
+	try {
+		const session = await mongoose.startSession();
+		try {
+			await session.withTransaction(async () => {
+				updatedTarget2 = await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUser._id } }, { new: true, session }).select('followers');
+				updatedCurrent2 = await User.findByIdAndUpdate(currentUser._id, { $addToSet: { following: targetUser._id } }, { new: true, session }).select('following');
+				try { await Notification.create([{ from: currentUser._id, to: targetUser._id, type: 'follow' }], { session }); } catch(e) { console.warn('Failed to create follow notification in tx', e); }
+			});
+		} finally {
+			session.endSession();
+		}
+	} catch (txErr) {
+		console.warn('followUser: transactions not available for follow, falling back', txErr.message || txErr);
+		try {
+			[updatedTarget2, updatedCurrent2] = await Promise.all([
+				User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUser._id } }, { new: true }).select('followers'),
+				User.findByIdAndUpdate(currentUser._id, { $addToSet: { following: targetUser._id } }, { new: true }).select('following'),
+			]);
+			try { await Notification.create({ from: currentUser._id, to: targetUser._id, type: 'follow' }); } catch(e) { console.warn('Failed to create follow notification', e); }
+		} catch (err) {
+			console.error('followUser: error during follow fallback updates', err);
+			return res.status(500).json({ message: 'Failed to follow user' });
+		}
+	}
+
+	console.log(`followUser: follow completed targetFollowers=${(updatedTarget2.followers || []).length} currentFollowing=${(updatedCurrent2.following || []).length}`);
+
+	return res.status(200).json({ message: 'Followed user', isFollowing: true, followersCount: (updatedTarget2.followers || []).length, followingCount: (updatedCurrent2.following || []).length });
 
 	// create notification for the target user
 	try {
@@ -162,6 +211,8 @@ export const followUser = asyncHandler(async (req, res) => {
 	// fetch updated counts
 	const updatedTarget = await User.findById(targetUserId).select('followers');
 	const updatedCurrent = await User.findById(currentUser._id).select('following');
+
+	console.log(`followUser: follow completed targetFollowers=${updatedTarget.followers.length} currentFollowing=${updatedCurrent.following.length}`);
 
 	return res.status(200).json({ message: 'Followed user', isFollowing: true, followersCount: updatedTarget.followers.length, followingCount: updatedCurrent.following.length });
 });

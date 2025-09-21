@@ -303,7 +303,9 @@ export default function Profile() {
           </View>
 
           {listLoading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
           ) : (
             <FlatList
               data={listUsers}
