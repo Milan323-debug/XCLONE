@@ -18,6 +18,24 @@ export const getUserProfile = asyncHandler(async (req, res) => {
 	res.status(200).json({ user });
 });
 
+// Get user by id (public)
+export const getUserById = asyncHandler(async (req, res) => {
+	const { id } = req.params;
+	if (!id) return res.status(400).json({ message: 'Missing user id' });
+	const user = await User.findById(id).select('-password');
+	if (!user) return res.status(404).json({ message: 'User not found' });
+	res.status(200).json({ user });
+});
+
+// Batch fetch users by array of ids
+export const getUsersBatch = asyncHandler(async (req, res) => {
+	const { ids } = req.body || {};
+	if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'Invalid ids' });
+	// ensure valid ObjectId strings
+	const users = await User.find({ _id: { $in: ids } }).select('-password');
+	res.status(200).json({ users });
+});
+
 // Sync user (placeholder - ensure user exists / create minimal record)
 export const syncUser = asyncHandler(async (req, res) => {
 	const user = req.user;

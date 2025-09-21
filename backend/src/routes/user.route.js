@@ -3,6 +3,8 @@ import {
   followUser,
   getCurrentUser,
   getUserProfile,
+  getUserById,
+  getUsersBatch,
   syncUser,
   updateProfile,
 } from "../controllers/user.controller.js";
@@ -13,6 +15,10 @@ const router = express.Router();
 
 // public route
 router.get("/profile/:username", getUserProfile);
+// fetch user by id
+router.get("/:id", getUserById);
+// batch fetch users by ids
+router.post('/batch', getUsersBatch);
 
 // protected routes
 router.post("/sync", protectRoute, syncUser);

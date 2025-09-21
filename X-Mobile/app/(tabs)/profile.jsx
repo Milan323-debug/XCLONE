@@ -9,6 +9,8 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import PostComposer from '../../components/PostComposer'
@@ -17,6 +19,7 @@ import { useAuthStore } from '../../store/authStore'
 import { API_URL } from '../../constants/api'
 import { COLORS } from '../../constants/colors'
 import { Feather } from '@expo/vector-icons'
+import FollowButton from '../../components/FollowButton'
 
 export default function Profile() {
   const { user, token, logout } = useAuthStore()
@@ -24,6 +27,10 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [posts, setPosts] = useState([])
   const [postsLoading, setPostsLoading] = useState(false)
+  const [listModalVisible, setListModalVisible] = useState(false)
+  const [listModalType, setListModalType] = useState(null) // 'followers' | 'following'
+  const [listUsers, setListUsers] = useState([])
+  const [listLoading, setListLoading] = useState(false)
 
   // composer
   const [newContent, setNewContent] = useState('')
@@ -63,6 +70,50 @@ export default function Profile() {
     } finally {
       setPostsLoading(false)
     }
+  }
+
+  const openListModal = async (type) => {
+    if (!profileUser) return;
+    setListModalType(type);
+    setListLoading(true);
+    setListModalVisible(true);
+    try {
+      // profileUser.followers and following may contain user objects; normalize
+      const list = (type === 'followers' ? (profileUser.followers || []) : (profileUser.following || []));
+      // if list contains ids, fetch full user objects from backend
+      const needFetch = list.length > 0 && typeof list[0] !== 'object';
+      if (needFetch) {
+        try {
+          const res = await fetch(`${API_URL}/api/user/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: list }),
+          });
+          if (res.ok) {
+            const j = await res.json();
+            setListUsers(j.users || []);
+          } else {
+            setListUsers([]);
+          }
+        } catch (e) {
+          console.warn('batch fetch error', e);
+          setListUsers([]);
+        }
+      } else {
+        setListUsers(list || []);
+      }
+    } catch (e) {
+      console.warn('openListModal error', e);
+      setListUsers([]);
+    } finally {
+      setListLoading(false);
+    }
+  }
+
+  const closeListModal = () => {
+    setListModalVisible(false);
+    setListModalType(null);
+    setListUsers([]);
   }
 
   const pickImage = async (forProfile) => {
@@ -184,12 +235,32 @@ export default function Profile() {
         <TouchableOpacity onPress={() => pickImage(true)}>
           <Image source={{ uri: profileUser?.profileImage || (profileUser?.profileImage?.secure_url) || 'https://i.pravatar.cc/80' }} style={styles.avatar} />
         </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.name}>{profileUser?.firstName ? `${profileUser.firstName} ${profileUser.lastName || ''}` : profileUser.username}</Text>
-          <Text style={styles.handle}>@{profileUser?.username}</Text>
+        <View style={{ flex: 1, marginLeft: 12, paddingRight: 12 }}>
+          <Text style={[styles.name, { marginTop: 6 }]}>{profileUser?.firstName ? `${profileUser.firstName} ${profileUser.lastName || ''}` : profileUser.username}</Text>
+          <Text style={[styles.handle, { marginTop: 4 }]}>@{profileUser?.username}</Text>
           <Text style={styles.bio}>{profileUser?.bio || ''}</Text>
+
+          {/* Inline stats within header: Posts / Followers / Following */}
+          <View style={styles.statsRowHeader}>
+            <Pressable onPress={() => { /* no-op: posts list is below */ }} style={styles.statItem}>
+              <Text style={styles.statNumber}>{posts.length}</Text>
+              <Text style={styles.statLabel}>Posts</Text>
+            </Pressable>
+
+            <Pressable onPress={() => openListModal('followers')} style={styles.statItem}>
+              <Text style={styles.statNumber}>{profileUser?.followers?.length || 0}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </Pressable>
+
+            <Pressable onPress={() => openListModal('following')} style={styles.statItem}>
+              <Text style={styles.statNumber}>{profileUser?.following?.length || 0}</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
+
+      {/* stats moved into the profile header */}
 
       {/* Composer */}
       <PostComposer />
@@ -217,6 +288,58 @@ export default function Profile() {
           />
         )}
       </View>
+
+      {/* Modal showing followers / following list */}
+      <Modal
+        visible={listModalVisible}
+        animationType="slide"
+        onRequestClose={closeListModal}
+        transparent={false}
+      >
+        <View style={{ flex: 1, padding: 12, backgroundColor: COLORS.background }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.text }}>{listModalType === 'followers' ? 'Followers' : 'Following'}</Text>
+            <TouchableOpacity onPress={closeListModal}><Text style={{ color: COLORS.primary }}>Close</Text></TouchableOpacity>
+          </View>
+
+          {listLoading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          ) : (
+            <FlatList
+              data={listUsers}
+              keyExtractor={(i) => String(i._id || i.id)}
+              renderItem={({ item }) => {
+                const isMe = item._id === user._id;
+                const curFollowing = user?.following || [];
+                const isFollowingItem = curFollowing.some((f) => String(f._id || f) === String(item._id || item.id));
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: COLORS.border }}>
+                    <Image source={{ uri: item.profileImage || 'https://i.pravatar.cc/48' }} style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '700', color: COLORS.text }}>{item.firstName ? `${item.firstName} ${item.lastName || ''}` : item.username}</Text>
+                      <Text style={{ color: COLORS.textLight }}>@{item.username}</Text>
+                    </View>
+                    {!isMe && (
+                      <FollowButton
+                        isFollowing={isFollowingItem}
+                        loading={false}
+                        onToggle={async () => {
+                          try {
+                            await useAuthStore.getState().toggleFollow(item._id || item.id);
+                            // refresh local user and profileUser
+                            await useAuthStore.getState().fetchMe();
+                            await fetchProfile();
+                          } catch (e) { console.warn('list follow toggle', e) }
+                        }}
+                      />
+                    )}
+                  </View>
+                )
+              }}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   )
 }
@@ -230,6 +353,10 @@ const styles = StyleSheet.create({
   name: { fontWeight: '700', color: COLORS.text, fontSize: 16 },
   handle: { color: COLORS.textLight, marginTop: 2 },
   bio: { color: COLORS.text, marginTop: 8 },
+  statsRowHeader: { flexDirection: 'row', marginTop: 10, alignItems: 'flex-end', justifyContent: 'flex-start' },
+  statItem: { marginRight: 16, alignItems: 'center', width: 72 },
+  statNumber: { fontWeight: '700', fontSize: 15, color: COLORS.text, textAlign: 'center' },
+  statLabel: { color: COLORS.textLight, fontSize: 13, marginTop: 4, textAlign: 'center' },
   composer: { marginTop: 12, padding: 12, backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border },
   composerInput: { minHeight: 44, color: COLORS.text, maxHeight: 140 },
   composerActions: { flexDirection: 'row', marginTop: 8 },
