@@ -46,13 +46,8 @@ export default function Profile() {
     if (!token || !user) return
     setLoading(true)
     try {
-      console.debug('fetchProfile: token present?', !!token, 'user id=', user?._id)
       const res = await fetch(`${API_URL}/api/user/me`, { headers: { Authorization: `Bearer ${token}` } })
-      if (!res.ok) {
-        const body = await res.text().catch(() => '<no body>');
-        console.warn('fetchProfile (me) failed', res.status, body);
-        throw new Error(`Failed to load profile: ${res.status} ${body}`)
-      }
+      if (!res.ok) throw new Error('Failed to load profile')
       const json = await res.json()
       setProfileUser(json.user || user)
     } catch (e) {
@@ -89,27 +84,20 @@ export default function Profile() {
       const needFetch = list.length > 0 && typeof list[0] !== 'object';
       if (needFetch) {
         try {
-          console.debug('openListModal: fetching batch for ids count=', list.length);
           const res = await fetch(`${API_URL}/api/user/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: list }),
           });
-          const text = await res.text();
-          let j = null;
-          try { j = text ? JSON.parse(text) : null; } catch(e) { console.debug('openListModal: batch response not json', text); }
-          if (res.ok && j && Array.isArray(j.users)) {
+          if (res.ok) {
+            const j = await res.json();
             setListUsers(j.users || []);
           } else {
-            console.warn('openListModal: batch fetch failed', res.status, text);
-            // fallback: show placeholder objects so user sees something
-            const placeholders = list.map(id => ({ _id: id, username: id.substring(0, 8), profileImage: 'https://i.pravatar.cc/48' }));
-            setListUsers(placeholders);
+            setListUsers([]);
           }
         } catch (e) {
           console.warn('batch fetch error', e);
-          const placeholders = list.map(id => ({ _id: id, username: id.substring(0, 8), profileImage: 'https://i.pravatar.cc/48' }));
-          setListUsers(placeholders);
+          setListUsers([]);
         }
       } else {
         setListUsers(list || []);

@@ -40,12 +40,8 @@ app.use("/api/notifications", notificationRoutes);
 
 
 app.use((err, req, res, next) => {
-  console.error("Error occurred:", err && err.stack ? err.stack : err);
-  // In development return error details to help debugging; in production hide stack
-  if ((ENV.NODE_ENV || process.env.NODE_ENV) === 'production') {
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
-  return res.status(500).json({ error: err?.message || 'Internal Server Error', stack: err?.stack });
+  console.error("Error occurred:", err);
+  res.status(500).json({ error: "Internal Server Error" });
 });
 
 const startServer = async () => {
