@@ -33,17 +33,31 @@ export const useAuthStore = create((set) => ({
         try {
             const res = await fetch(`${API_URL}/api/user/follow/${targetUserId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
             const json = await res.json();
+            console.debug('toggleFollow response', res.status, json);
             if (!res.ok) return { success: false, error: json.message || json.error || 'Failed' };
-            // Update local user.following if this action affected current user's following
-            // If the current user toggled following on someone else, fetchMe would fetch fresh data, but we'll optimistically update
-            const isFollowing = json.isFollowing;
-            // update local following array length in user object
-            const updatedUser = { ...current };
-            if (typeof json.followingCount === 'number') {
-                // adjust local following count if present on returned payload
-                // if the current user is the action actor, their followingCount changed
-                // we don't store followingCount separately, so no-op here
+
+            // Optimistically update local auth user so UI reflects changes immediately and persists
+            try {
+                const isFollowing = !!json.isFollowing;
+                const updatedUser = { ...current };
+                const following = Array.isArray(updatedUser.following) ? [...updatedUser.following] : [];
+                if (isFollowing) {
+                    // add if not present
+                    if (!following.some((f) => String(f._id || f) === String(targetUserId))) {
+                        following.push({ _id: targetUserId });
+                    }
+                } else {
+                    // remove
+                    const idx = following.findIndex((f) => String(f._id || f) === String(targetUserId));
+                    if (idx !== -1) following.splice(idx, 1);
+                }
+                updatedUser.following = following;
+                await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+                set({ user: updatedUser });
+            } catch (e) {
+                console.warn('toggleFollow: optimistic update failed', e);
             }
+
             // Trigger a refresh of the current user from backend for accuracy
             try { await useAuthStore.getState().fetchMe(); } catch (e) { /* ignore */ }
             return { success: true, data: json };

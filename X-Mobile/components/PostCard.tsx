@@ -30,16 +30,23 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
   const author: any = React.useMemo(() => post?.user || post?.userId || {}, [post]);
   const isOwner = React.useMemo(() => currentUser?._id === (author?._id || author?.id || author?._ref), [currentUser?._id, author]);
   const [followLoading, setFollowLoading] = useState(false);
-  const [isFollowingLocal, setIsFollowingLocal] = useState<boolean>(() => {
+  const storeUser = useAuthStore((s) => s.user);
+  const [isFollowingLocal, setIsFollowingLocal] = useState<boolean>(false);
+
+  // keep local follow state in sync with auth store and author
+  React.useEffect(() => {
     try {
-      const cur = useAuthStore.getState().user;
-      if (!cur || !author) return false;
-      const following = cur.following || [];
-      return following.some((f: any) => String(f) === String(author._id || author.id || author?._ref));
+      if (!storeUser || !author) {
+        setIsFollowingLocal(false);
+        return;
+      }
+      const following = storeUser.following || [];
+      const found = following.some((f: any) => String(f._id || f) === String(author._id || author.id || author._ref));
+      setIsFollowingLocal(!!found);
     } catch (e) {
-      return false;
+      setIsFollowingLocal(false);
     }
-  });
+  }, [storeUser, author]);
   const formattedDate = React.useMemo(() => post?.createdAt ? formatRelativeTime(post.createdAt) : '', [post?.createdAt]);
 
   const authorName = React.useMemo(() =>

@@ -21,6 +21,8 @@ export default function UserProfile() {
   const { username } = useLocalSearchParams();
   const { token, user: currentUser } = useAuthStore();
   const [user, setUser] = useState(null);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
@@ -40,7 +42,9 @@ export default function UserProfile() {
         throw new Error(`Failed to load profile: ${res.status} ${body}`);
       }
       const json = await res.json();
-      setUser(json.user);
+  setUser(json.user);
+  setFollowersCount(Array.isArray(json.user?.followers) ? json.user.followers.length : (json.user?.followers || 0));
+  setFollowingCount(Array.isArray(json.user?.following) ? json.user.following.length : (json.user?.following || 0));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       console.error('fetchProfile error:', e);
@@ -124,18 +128,33 @@ export default function UserProfile() {
       }
       // update UI based on returned payload
       setIsFollowing(!!data.isFollowing);
+      	// refresh local profile from server/authStore to ensure lists are correct
+      	try {
+      	  const refreshed = await useAuthStore.getState().fetchMe();
+      	  // if the affected profile is the same as current auth user, update local user
+      	  if (refreshed && refreshed._id === user._id) {
+      	    setUser(refreshed);
+      	  } else {
+      	    // otherwise refetch the public profile to get updated follower list
+      	    await fetchProfile();
+      	  }
+      	} catch (e) {
+      	  // fall back to using returned counts
+      	}
+      // prefer counts returned from the API for accuracy; fall back to optimistic array changes
       if (typeof data.followersCount === 'number') {
-        setUser((u) => ({ ...u, followers: new Array(data.followersCount).fill(null) }));
+        setFollowersCount(data.followersCount);
       } else {
-        // optimistic update
-        setUser((u) => {
-          if (!u) return u;
-          const followers = u.followers || [];
-          if (data.isFollowing) {
-            return { ...u, followers: [...followers, { _id: useAuthStore.getState().user._id }] };
-          }
-          return { ...u, followers: followers.filter((f) => (f._id || f).toString() !== useAuthStore.getState().user._id.toString()) };
-        });
+        setFollowersCount((c) => (data.isFollowing ? c + 1 : Math.max(0, c - 1)));
+      }
+      if (typeof data.followingCount === 'number') {
+        setFollowingCount(data.followingCount);
+      } else {
+        // if current user toggled follow, adjust their following count in currentUser stored in authStore.fetchMe
+        // we still update local displayed following for the profile if it's the current user's profile
+        if (useAuthStore.getState().user?._id === user._id) {
+          setFollowingCount((c) => (data.isFollowing ? c + 1 : Math.max(0, c - 1)));
+        }
       }
     } catch (e) {
       console.warn('toggleFollow failed', e);
@@ -194,10 +213,10 @@ export default function UserProfile() {
                 <Text style={styles.statsNumber}>{posts.length}</Text> Posts
               </Text>
               <Text style={styles.statsText}>
-                <Text style={styles.statsNumber}>{user.followers?.length || 0}</Text> Followers
+                <Text style={styles.statsNumber}>{followersCount || 0}</Text> Followers
               </Text>
               <Text style={styles.statsText}>
-                <Text style={styles.statsNumber}>{user.following?.length || 0}</Text> Following
+                <Text style={styles.statsNumber}>{followingCount || 0}</Text> Following
               </Text>
             </View>
           </View>
