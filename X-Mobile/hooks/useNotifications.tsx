@@ -11,23 +11,41 @@ export const useNotifications = () => {
   const token = useAuthStore((s) => s.token);
 
   const fetchNotifications = async () => {
-    setIsLoading(true);
+    if (!token) {
+      setNotifications([]);
+      setError(new Error('Not authenticated'));
+      setIsLoading(false);
+      return;
+    }
+
     setError(null);
     try {
-      const res = await fetch(`${API_URL}api/notifications`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-      if (!res.ok) throw new Error('Failed to load notifications');
+      const res = await fetch(`${API_URL}api/notifications`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || 'Failed to load notifications');
+      }
+      
       const json = await res.json();
       setNotifications(json.notifications || []);
     } catch (e) {
       setError(e instanceof Error ? e : new Error('Failed to load notifications'));
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    setIsLoading(true);
     void fetchNotifications();
-  }, []);
+  }, [token]);
 
   const refetch = async () => {
     setIsRefetching(true);

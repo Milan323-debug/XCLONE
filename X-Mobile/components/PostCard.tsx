@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Alert, Share } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { formatRelativeTime } from '../lib/timeUtils';
+import UserProfileModal from './UserProfileModal';
+import { useAuthStore } from '../store/authStore';
+import FollowButton from './FollowButton';
 
 import type { Post, User, PostWithCommentUpdate } from '../types';
 
@@ -18,11 +22,24 @@ interface Props {
 const { width } = Dimensions.get('window');
 
 const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentUser, isLiked }) => {
-    const videoRef = React.useRef<Video | null>(null);
+  const videoRef = React.useRef<Video | null>(null);
+  const router = useRouter();
   const [commentCount, setCommentCount] = React.useState(post?.comments?.length || 0);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   // author may be a User object or just an id/ref; narrow to a loose object shape for local use
   const author: any = React.useMemo(() => post?.user || post?.userId || {}, [post]);
   const isOwner = React.useMemo(() => currentUser?._id === (author?._id || author?.id || author?._ref), [currentUser?._id, author]);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [isFollowingLocal, setIsFollowingLocal] = useState<boolean>(() => {
+    try {
+      const cur = useAuthStore.getState().user;
+      if (!cur || !author) return false;
+      const following = cur.following || [];
+      return following.some((f: any) => String(f) === String(author._id || author.id || author?._ref));
+    } catch (e) {
+      return false;
+    }
+  });
   const formattedDate = React.useMemo(() => post?.createdAt ? formatRelativeTime(post.createdAt) : '', [post?.createdAt]);
 
   const authorName = React.useMemo(() =>
@@ -61,9 +78,36 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
   }, [post]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
+    <>
+      {showProfileModal && (
+        <UserProfileModal
+          isVisible={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          username={author?.username || author?.name || ''}
+        />
+      )}
+      <View style={styles.container}>
+        <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.userInfo}
+          onPress={() => {
+            // If tapping on your own profile, navigate to profile tab; otherwise show modal
+            const isMe = currentUser?._id && (currentUser._id === (author?._id || author?.id || author?._ref));
+            if (isMe) {
+              // navigate to profile tab
+              try {
+                router.push('/(tabs)/profile');
+              } catch (e) {
+                // fallback: show modal
+                setShowProfileModal(true);
+              }
+              return;
+            }
+            if (author?.username || author?.name) {
+              setShowProfileModal(true);
+            }
+          }}
+        >
           <Image
             source={{ uri: profileImageUri }}
             style={styles.avatar}
@@ -76,7 +120,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
               <Text style={styles.timestamp}>{formattedDate}</Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
         {isOwner && (
           <TouchableOpacity
             onPress={() => {
@@ -92,6 +136,31 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
           >
             <Ionicons name="ellipsis-horizontal" size={18} color="#536471" />
           </TouchableOpacity>
+        )}
+        {!isOwner && (
+          <FollowButton
+            isFollowing={isFollowingLocal}
+            loading={followLoading}
+            onToggle={async () => {
+              if (!author || !author._id && !author.id && !author._ref) return;
+              const targetId = author._id || author.id || author._ref;
+              try {
+                setFollowLoading(true);
+                const res = await useAuthStore.getState().toggleFollow(targetId);
+                if (res && res.success) {
+                  const isFollowing = res.data?.isFollowing;
+                  if (typeof isFollowing === 'boolean') setIsFollowingLocal(isFollowing);
+                  else setIsFollowingLocal(prev => !prev);
+                } else {
+                  setIsFollowingLocal(prev => !prev);
+                }
+              } catch (e) {
+                console.warn('Follow toggle error', e);
+              } finally {
+                setFollowLoading(false);
+              }
+            }}
+          />
         )}
       </View>
 
@@ -210,6 +279,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
         </TouchableOpacity>
       </View>
     </View>
+    </>
   );
 };
 

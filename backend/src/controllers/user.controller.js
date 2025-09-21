@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import User from '../models/user.model.js';
 import cloudinary from '../config/cloudinary.js';
+import Notification from '../models/notification.model.js';
 
 // Get current authenticated user
 export const getCurrentUser = asyncHandler(async (req, res) => {
@@ -111,23 +112,40 @@ export const followUser = asyncHandler(async (req, res) => {
 	const targetUser = await User.findById(targetUserId);
 	if (!targetUser) return res.status(404).json({ message: 'Target user not found' });
 
+	// determine current following state
 	const isFollowing = targetUser.followers.some((f) => f.toString() === currentUser._id.toString());
 
 	if (isFollowing) {
-		// unfollow
-		targetUser.followers = targetUser.followers.filter((f) => f.toString() !== currentUser._id.toString());
-		currentUser.following = currentUser.following.filter((f) => f.toString() !== targetUser._id.toString());
-		await targetUser.save();
-		await currentUser.save();
-		return res.status(200).json({ message: 'Unfollowed user' });
+		// unfollow using atomic $pull to avoid races
+		await User.findByIdAndUpdate(targetUserId, { $pull: { followers: currentUser._id } });
+		await User.findByIdAndUpdate(currentUser._id, { $pull: { following: targetUser._id } });
+
+		// optional: remove follow notification (not strictly necessary)
+		await Notification.deleteMany({ from: currentUser._id, to: targetUser._id, type: 'follow' }).catch(() => {});
+
+		// fetch updated counts
+		const updatedTarget = await User.findById(targetUserId).select('followers');
+		const updatedCurrent = await User.findById(currentUser._id).select('following');
+
+		return res.status(200).json({ message: 'Unfollowed user', isFollowing: false, followersCount: updatedTarget.followers.length, followingCount: updatedCurrent.following.length });
 	}
 
-	// follow
-	targetUser.followers.push(currentUser._id);
-	currentUser.following.push(targetUser._id);
-	await targetUser.save();
-	await currentUser.save();
-	return res.status(200).json({ message: 'Followed user' });
+	// follow using atomic $addToSet to prevent duplicates
+	await User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUser._id } });
+	await User.findByIdAndUpdate(currentUser._id, { $addToSet: { following: targetUser._id } });
+
+	// create notification for the target user
+	try {
+		await Notification.create({ from: currentUser._id, to: targetUser._id, type: 'follow' });
+	} catch (e) {
+		console.warn('Failed to create follow notification', e);
+	}
+
+	// fetch updated counts
+	const updatedTarget = await User.findById(targetUserId).select('followers');
+	const updatedCurrent = await User.findById(currentUser._id).select('following');
+
+	return res.status(200).json({ message: 'Followed user', isFollowing: true, followersCount: updatedTarget.followers.length, followingCount: updatedCurrent.following.length });
 });
 
 export default {};

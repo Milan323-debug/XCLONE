@@ -15,7 +15,8 @@ export const usePosts = (username?: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const url = username ? `${API_URL}api/posts/user/${username}` : `${API_URL}api/posts`;
+  const base = API_URL.replace(/\/$/, '');
+  const url = username ? `${base}/api/posts/user/${encodeURIComponent(username)}` : `${base}/api/posts`;
       const res = await fetch(url);
       if (!res.ok) {
         const txt = await res.text();

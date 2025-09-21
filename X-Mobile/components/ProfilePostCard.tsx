@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatRelativeTime } from '../lib/timeUtils';
+import { useRouter } from 'expo-router';
 
 type Props = {
   post?: any;
@@ -14,6 +15,7 @@ const ProfilePostCard: React.FC<Props> = ({ post, onDelete, currentUser }) => {
     currentUser?._id === (post?.user?._id || post?.userId?._id || post?.userId),
     [currentUser?._id, post?.user?._id, post?.userId]
   );
+  const router = useRouter();
   
   const formattedDate = React.useMemo(() => 
     post?.createdAt ? formatRelativeTime(post.createdAt) : '',
@@ -41,15 +43,42 @@ const ProfilePostCard: React.FC<Props> = ({ post, onDelete, currentUser }) => {
         </TouchableOpacity>
       )}
 
-      <View style={styles.postContentContainer}>
-        {(post?.media?.url || post?.image) && (
-          <Image
-            source={{ uri: post?.media?.url || post.image }}
-            style={styles.postImage}
-            resizeMode="cover"
-            progressiveRenderingEnabled={true}
-          />
-        )}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => {
+          const author = post?.user || post?.userId || {};
+          const isMe = currentUser?._id && (currentUser._id === (author?._id || author?.id || author?._ref));
+          if (isMe) {
+            router.push('/(tabs)/profile');
+          }
+        }}
+        style={styles.postContentContainer}
+      >
+        {
+          // prefer Cloudinary-generated poster for videos, fall back to media url or legacy image fields
+          (() => {
+            const mediaUrl = post?.media?.url || post?.image || post?.imageUrl || null;
+            const poster = post?.media?.poster || null;
+            const isVideo = post?.media?.type === 'video' || (post?.media && typeof post.media === 'object' && post.media.type === 'video');
+            const imageSource = isVideo ? (poster || mediaUrl) : mediaUrl;
+            if (!imageSource) return null;
+            return (
+              <View style={styles.imageWrapper}>
+                <Image
+                  source={{ uri: imageSource }}
+                  style={styles.postImage}
+                  resizeMode="cover"
+                  progressiveRenderingEnabled={true}
+                />
+                {isVideo && (
+                  <View style={styles.playOverlay} pointerEvents="none">
+                    <Ionicons name="play" size={28} color="rgba(255,255,255,0.95)" />
+                  </View>
+                )}
+              </View>
+            );
+          })()
+        }
         <View style={styles.metadataContainer}>
           <Text style={styles.content} numberOfLines={3}>
             {post?.content}
@@ -77,7 +106,7 @@ const ProfilePostCard: React.FC<Props> = ({ post, onDelete, currentUser }) => {
             </Text>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -112,6 +141,20 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 8,
     backgroundColor: '#EFF3F4',
+  },
+  imageWrapper: {
+    position: 'relative',
+  },
+  playOverlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 8,
   },
   metadataContainer: {
     flex: 1,

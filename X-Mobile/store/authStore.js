@@ -26,6 +26,31 @@ export const useAuthStore = create((set) => ({
             return null;
         }
     },
+    toggleFollow: async (targetUserId) => {
+        const token = useAuthStore.getState().token;
+        const current = useAuthStore.getState().user;
+        if (!token || !current) return { success: false, error: 'Not authenticated' };
+        try {
+            const res = await fetch(`${API_URL}/api/user/follow/${targetUserId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+            const json = await res.json();
+            if (!res.ok) return { success: false, error: json.message || json.error || 'Failed' };
+            // Update local user.following if this action affected current user's following
+            // If the current user toggled following on someone else, fetchMe would fetch fresh data, but we'll optimistically update
+            const isFollowing = json.isFollowing;
+            // update local following array length in user object
+            const updatedUser = { ...current };
+            if (typeof json.followingCount === 'number') {
+                // adjust local following count if present on returned payload
+                // if the current user is the action actor, their followingCount changed
+                // we don't store followingCount separately, so no-op here
+            }
+            // Trigger a refresh of the current user from backend for accuracy
+            try { await useAuthStore.getState().fetchMe(); } catch (e) { /* ignore */ }
+            return { success: true, data: json };
+        } catch (e) {
+            return { success: false, error: e.message || 'Network error' };
+        }
+    },
     
     register: async (username, email, password) => {
         // Early return for empty fields without setting loading state

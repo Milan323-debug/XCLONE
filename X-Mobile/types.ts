@@ -20,6 +20,9 @@ export type User = {
   firstName?: string;
   lastName?: string;
   profileImage?: string | { secure_url?: string };
+  bio?: string;
+  followers?: string[] | any[];
+  following?: string[] | any[];
 };
 
 export type PostWithCommentUpdate = Post & {

@@ -20,19 +20,42 @@ const NotificationsScreen = () => {
 
   const insets = useSafeAreaInsets();
 
-  if (error) {
-    return (
-      <View style={styles.centeredContainer}>
-        <Text style={styles.errorText}>Failed to load notifications</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <View style={[styles.centeredContainer, styles.fullScreen]}>
+          <ActivityIndicator size="large" color="#1DA1F2" />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={[styles.centeredContainer, styles.fullScreen]}>
+          <Text style={styles.errorText}>Failed to load notifications</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (notifications.length === 0) {
+      return <NoNotificationsFound onRefresh={refetch} />;
+    }
+
+    return notifications.map((notification) => (
+      <NotificationCard
+        key={notification._id}
+        notification={notification}
+        onDelete={deleteNotification}
+      />
+    ));
+  };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Notifications</Text>
@@ -43,29 +66,21 @@ const NotificationsScreen = () => {
 
       {/* CONTENT */}
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 100 + insets.bottom }
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={"#1DA1F2"} />
+          <RefreshControl 
+            refreshing={isRefetching} 
+            onRefresh={refetch} 
+            tintColor="#1DA1F2"
+          />
         }
       >
-        {isLoading ? (
-          <View style={styles.centeredContainer}>
-            <ActivityIndicator size="large" color="#1DA1F2" />
-            <Text style={styles.loadingText}>Loading notifications...</Text>
-          </View>
-        ) : notifications.length === 0 ? (
-          <NoNotificationsFound onRefresh={refetch} />
-        ) : (
-          notifications.map((notification) => (
-            <NotificationCard
-              key={notification._id}
-              notification={notification}
-              onDelete={deleteNotification}
-            />
-          ))
-        )}
+        {renderContent()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -73,11 +88,61 @@ const NotificationsScreen = () => {
 export default NotificationsScreen;
 
 const styles = StyleSheet.create({
-  centeredContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  errorText: { color: '#6b7280', marginBottom: 12 },
-  retryBtn: { backgroundColor: '#1DA1F2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  retryText: { color: '#fff', fontWeight: '700' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
-  loadingText: { color: '#6b7280', marginTop: 12 },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  fullScreen: {
+    minHeight: '100%',
+  },
+  centeredContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  errorText: {
+    color: '#6b7280',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: '#1DA1F2',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 9999,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  loadingText: {
+    color: '#6b7280',
+    marginTop: 12,
+    fontSize: 15,
+  },
 });
