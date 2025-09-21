@@ -42,9 +42,19 @@ export default function UserProfile() {
         throw new Error(`Failed to load profile: ${res.status} ${body}`);
       }
       const json = await res.json();
-  setUser(json.user);
-  setFollowersCount(Array.isArray(json.user?.followers) ? json.user.followers.length : (json.user?.followers || 0));
-  setFollowingCount(Array.isArray(json.user?.following) ? json.user.following.length : (json.user?.following || 0));
+      setUser(json.user);
+      // prefer numeric counts returned by API when available
+      if (typeof json.followersCount === 'number') {
+        setFollowersCount(json.followersCount);
+      } else {
+        setFollowersCount(Array.isArray(json.user?.followers) ? json.user.followers.length : (json.user?.followers || 0));
+      }
+      if (typeof json.followingCount === 'number') {
+        setFollowingCount(json.followingCount);
+      } else {
+        setFollowingCount(Array.isArray(json.user?.following) ? json.user.following.length : (json.user?.following || 0));
+      }
+      console.debug('fetchProfile: followersCount=', json.followersCount, 'user.followers.length=', Array.isArray(json.user?.followers) ? json.user.followers.length : json.user?.followers);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       console.error('fetchProfile error:', e);
@@ -141,6 +151,7 @@ export default function UserProfile() {
       	} catch (e) {
       	  // fall back to using returned counts
       	}
+    console.debug('toggleFollow: api data=', data);
       // prefer counts returned from the API for accuracy; fall back to optimistic array changes
       if (typeof data.followersCount === 'number') {
         setFollowersCount(data.followersCount);

@@ -16,7 +16,9 @@ export const getUserProfile = asyncHandler(async (req, res) => {
 	const { username } = req.params;
 	const user = await User.findOne({ username }).select('-password');
 	if (!user) return res.status(404).json({ message: 'User not found' });
-	res.status(200).json({ user });
+	const followersCount = Array.isArray(user.followers) ? user.followers.length : 0;
+	const followingCount = Array.isArray(user.following) ? user.following.length : 0;
+	res.status(200).json({ user, followersCount, followingCount });
 });
 
 // Get user by id (public)
