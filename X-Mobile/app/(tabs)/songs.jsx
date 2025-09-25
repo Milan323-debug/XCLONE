@@ -43,9 +43,33 @@ export default function Songs() {
 
   const pickFile = async () => {
     try {
-      const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' })
-      if (res.type === 'success') {
-        setPickedFile(res)
+      const pickerType = Platform.OS === 'ios' ? 'public.audio' : 'audio/*'
+      const res = await DocumentPicker.getDocumentAsync({ type: pickerType, copyToCacheDirectory: true })
+      console.debug('DocumentPicker result', res)
+      // Newer expo-document-picker returns { canceled: boolean, assets: [{ uri, name, size, mimeType }] }
+      if (res && Array.isArray(res.assets) && res.canceled === false) {
+        const asset = res.assets[0]
+        const uri = asset.uri
+        let name = asset.name || (uri ? uri.split('/').pop() : undefined)
+        const mimeType = asset.mimeType || asset.type || undefined
+        const normalized = { uri, name, size: asset.size, mimeType, raw: res }
+        console.debug('Normalized picked file (assets)', normalized)
+        setPickedFile(normalized)
+      } else if (res && res.type === 'success') {
+        // legacy shape
+        const uri = res.uri
+        let name = res.name
+        if (!name && uri) {
+          const parts = uri.split('/')
+          name = parts[parts.length - 1]
+        }
+        const mimeType = res.mimeType || res.mime || undefined
+        const normalized = { uri, name, size: res.size, mimeType, raw: res }
+        console.debug('Normalized picked file (legacy)', normalized)
+        setPickedFile(normalized)
+      } else if (res && (res.type === 'cancel' || res.canceled === true)) {
+        console.debug('DocumentPicker cancelled')
+        Alert.alert('Selection cancelled', 'No file was selected')
       }
     } catch (e) {
       console.warn('pickFile', e)
@@ -66,8 +90,10 @@ export default function Songs() {
 
     const form = new FormData()
     // for react native, file object should be { uri, name, type }
-    const name = file.name || `song.${file.uri.split('.').pop()}`
-    form.append('file', { uri: file.uri, name, type: file.mimeType || 'audio/mpeg' })
+  const name = file.name || (file.uri ? file.uri.split('/').pop() : `song.${(file.uri || '').split('.').pop()}`)
+  // some pickers don't return mimeType; fall back to common audio mime
+  const type = file.mimeType || 'audio/mpeg'
+  form.append('file', { uri: file.uri, name, type })
     form.append('api_key', signJson.api_key)
     form.append('timestamp', String(signJson.timestamp))
     form.append('signature', signJson.signature)
@@ -159,9 +185,12 @@ export default function Songs() {
         <TextInput placeholder="Title" value={title} onChangeText={setTitle} style={styles.input} />
         <TextInput placeholder="Artist" value={artist} onChangeText={setArtist} style={styles.input} />
 
-        <TouchableOpacity style={styles.fileBtn} onPress={pickFile}>
-          <Text style={styles.fileBtnText}>{pickedFile ? pickedFile.name : 'Choose audio file'}</Text>
+        <TouchableOpacity style={styles.fileBtn} onPress={pickFile} disabled={uploading}>
+          <Text style={styles.fileBtnText}>{pickedFile ? `Selected: ${pickedFile.name}` : 'Choose audio file'}</Text>
         </TouchableOpacity>
+        {pickedFile && (
+          <Text style={{ color: COLORS.textLight, marginTop: 6 }}>{pickedFile.name} {pickedFile.size ? `· ${(pickedFile.size/1024).toFixed(1)} KB` : ''}</Text>
+        )}
 
         <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: COLORS.primary }]} onPress={handleUpload} disabled={uploading}>
           {uploading ? <ActivityIndicator color={COLORS.white} /> : <Text style={[styles.uploadBtnText, { color: COLORS.white }]}>Upload</Text>}

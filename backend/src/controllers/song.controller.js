@@ -77,12 +77,12 @@ export const getUploadSignature = asyncHandler(async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
-  const { publicId, folder, resource_type } = req.body || {};
+  const { publicId, folder } = req.body || {};
   const timestamp = Math.floor(Date.now() / 1000);
+  // Sign only the parameters that will be sent reliably (timestamp, folder, public_id)
   const paramsToSign = { timestamp };
   if (folder) paramsToSign.folder = folder;
   if (publicId) paramsToSign.public_id = publicId;
-  if (resource_type) paramsToSign.resource_type = resource_type;
 
   // cloudinary.utils.api_sign_request requires the params and the API secret
   const signature = cloudinary.utils.api_sign_request(paramsToSign, ENV.CLOUDINARY_API_SECRET);
