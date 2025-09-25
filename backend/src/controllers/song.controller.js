@@ -94,3 +94,34 @@ export const getUploadSignature = asyncHandler(async (req, res) => {
     cloud_name: ENV.CLOUDINARY_CLOUD_NAME,
   });
 });
+
+export const deleteSong = asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
+  const { songId } = req.params;
+  const song = await Song.findById(songId);
+  if (!song) return res.status(404).json({ error: 'Song not found' });
+
+  // only owner can delete
+  if (song.user.toString() !== user._id.toString()) {
+    return res.status(403).json({ error: 'Not allowed to delete this song' });
+  }
+
+  try {
+    if (song.publicId) {
+      try {
+        // delete raw resource from Cloudinary
+        await cloudinary.uploader.destroy(song.publicId, { resource_type: 'raw' });
+      } catch (e) {
+        console.warn('Failed to delete cloudinary resource for song', e);
+      }
+    }
+
+    await Song.findByIdAndDelete(songId);
+    res.status(200).json({ message: 'Song deleted' });
+  } catch (e) {
+    console.error('deleteSong error', e);
+    res.status(500).json({ error: 'Failed to delete song' });
+  }
+});

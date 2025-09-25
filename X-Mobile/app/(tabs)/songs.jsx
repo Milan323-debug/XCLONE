@@ -8,6 +8,7 @@ import { useAuthStore } from '../../store/authStore'
 
 export default function Songs() {
   const { token } = useAuthStore();
+  const currentUser = useAuthStore((s) => s.user);
   const [songs, setSongs] = useState([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -173,6 +174,25 @@ export default function Songs() {
         <TouchableOpacity style={styles.playBtn} onPress={stopPlayback}><Text style={styles.playText}>Stop</Text></TouchableOpacity>
       ) : (
         <TouchableOpacity style={[styles.playBtn, { backgroundColor: COLORS.primary }]} onPress={() => playSong(item)}><Text style={[styles.playText, { color: COLORS.white }]}>Play</Text></TouchableOpacity>
+      )}
+      { (currentUser && item.user && String(item.user._id) === String(currentUser._id)) && (
+        <TouchableOpacity style={[styles.deleteBtn]} onPress={async () => {
+          Alert.alert('Delete song', 'Are you sure?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: async () => {
+              try {
+                const res = await fetch(`${API_URL}/api/songs/${item._id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Delete failed')
+                setSongs((s) => s.filter((x) => x._id !== item._id))
+              } catch (e) {
+                console.warn('delete song failed', e)
+                Alert.alert('Delete failed', e.message)
+              }
+            }}
+          ])
+        }}>
+          <Text style={{ color: '#c0392b', marginLeft: 12 }}>Delete</Text>
+        </TouchableOpacity>
       )}
     </View>
   )
