@@ -24,7 +24,7 @@ const NotificationsScreen = () => {
     if (isLoading) {
       return (
         <View style={[styles.centeredContainer, styles.fullScreen]}>
-          <ActivityIndicator size="large" color="#1DA1F2" />
+          <ActivityIndicator size="large" color="#23D5D5" />
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
       );

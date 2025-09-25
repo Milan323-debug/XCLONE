@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, StyleSheet, ActivityIndicator, FlatList, Image, TextInput, TouchableOpacity, Alert, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../constants/api';
+import { getProfileImageUri } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
 
 interface CommentsModalProps {
@@ -230,7 +231,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({ selectedPost, onClose, on
               return (
                 <View style={styles.threadContainer}>
                   <View style={styles.commentRow}>
-                    <Image source={{ uri: item.user?.profileImage || 'https://i.pravatar.cc/40' }} style={styles.avatar} />
+                    <Image source={{ uri: getProfileImageUri(item.user) || 'https://i.pravatar.cc/40' }} style={styles.avatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.commentUser}>{item.user?.username || 'User'}</Text>
                       <Text style={styles.commentText}>{item.content}</Text>
@@ -336,7 +337,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({ selectedPost, onClose, on
                           <View style={styles.replyLine} />
                           <View style={styles.replyContent}>
                             <Image 
-                              source={{ uri: reply.user?.profileImage || 'https://i.pravatar.cc/32' }} 
+                              source={{ uri: getProfileImageUri(reply.user) || 'https://i.pravatar.cc/32' }} 
                               style={styles.replyAvatar} 
                             />
                             <View style={styles.replyTextContainer}>
@@ -388,7 +389,7 @@ const CommentsModal: React.FC<CommentsModalProps> = ({ selectedPost, onClose, on
 
         <View style={styles.inputContainer}>
           <View style={styles.composer}>
-            <Image source={{ uri: currentUser?.profileImage || 'https://i.pravatar.cc/40' }} style={styles.avatarSmall} />
+            <Image source={{ uri: getProfileImageUri(currentUser) || 'https://i.pravatar.cc/40' }} style={styles.avatarSmall} />
             <View style={{ flex: 1 }}>
               {replyTo ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>

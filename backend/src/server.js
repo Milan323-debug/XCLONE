@@ -5,6 +5,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.route.js";  
 import postRoutes from "./routes/post.routes.js";
+import songRoutes from "./routes/song.routes.js";
 import protectRoute from "./middleware/auth.middleware.js";
 import commentRoutes from "./routes/comment.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
@@ -35,6 +36,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/user", userRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/songs", songRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/notifications", notificationRoutes);
 

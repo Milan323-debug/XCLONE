@@ -43,6 +43,12 @@ const _layout = () => {
           <Ionicons name="notifications-outline" size = {size} color={color} />
         )
       }} />
+      <Tabs.Screen name="songs" options={{
+        title: "",
+        tabBarIcon: ({color , size}) => (
+          <Ionicons name="play-circle-outline" size = {size} color={color} />
+        )
+      }} />
       <Tabs.Screen name="profile" options={{
         title: "",
         tabBarIcon: ({color , size}) => (

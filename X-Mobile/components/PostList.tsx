@@ -48,7 +48,7 @@ const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1DA1F2" />
+        <ActivityIndicator size="large" color="#23D5D5" />
         <Text style={styles.hint}>Loading posts...</Text>
       </View>
     );
@@ -113,8 +113,24 @@ const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
 export default PostsList;
 
 const styles = StyleSheet.create({
-  center: { padding: 24, alignItems: 'center' },
-  hint: { color: '#6b7280', marginTop: 8 },
-  retryBtn: { backgroundColor: '#1DA1F2', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, marginTop: 12 },
-  retryText: { color: '#fff', fontWeight: '700' },
+  center: { 
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hint: { 
+    color: '#6b7280', 
+    marginTop: 8 
+  },
+  retryBtn: { 
+    backgroundColor: '#23D5D5', 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
+    borderRadius: 8, 
+    marginTop: 12 
+  },
+  retryText: { 
+    color: '#fff', 
+    fontWeight: '700' 
+  },
 });

@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { useAuthStore } from '../store/authStore';
 import styles from '../assets/styles/login.styles';
 import { Image } from 'expo-image';
-import { formatMemberSince } from '../lib/utils';
+import { formatMemberSince, getProfileImageUri } from '../lib/utils';
 import * as ImagePicker from 'expo-image-picker';
 import { API_URL } from '../constants/api';
 
@@ -103,7 +103,7 @@ export default function ProfileHeader() {
         <View style={styles.profileHeader}>
             <TouchableOpacity onPress={handlePickProfileImage} activeOpacity={0.7} disabled={uploading}>
                 <Image
-                    source={{ uri: localProfileImage || user.profileImage || undefined }}
+                    source={{ uri: localProfileImage || getProfileImageUri(user) || undefined }}
                     style={styles.profileImage}
                     contentFit="cover"
                 />

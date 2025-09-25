@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../constants/api';
+import { getProfileImageUri } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
 import ProfilePostCard from './ProfilePostCard';
 
@@ -117,9 +118,7 @@ export default function UserProfileModal({ isVisible, onClose, username }: UserP
               {/* Profile Info */}
               <View style={styles.profileInfo}>
                 <Image
-                  source={{
-                    uri: user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName || user.username)}&background=random`
-                  }}
+                  source={{ uri: getProfileImageUri(user) || undefined }}
                   style={styles.profileImage}
                 />
                 <Text style={styles.name}>{user.firstName} {user.lastName}</Text>

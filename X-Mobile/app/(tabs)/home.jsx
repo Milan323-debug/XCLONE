@@ -2,10 +2,8 @@ import PostComposer from "../../components/PostComposer";
 import PostsList from "../../components/PostList";
 import { usePosts, triggerRefetch } from "../../hooks/usePosts";
 import { useUserSync } from "../../hooks/useUserSync";
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { RefreshControl, ScrollView, Text, View, TouchableOpacity, Image } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import SignOutButton from "../../components/SignOutButton";
 
 const HomeScreen = () => {

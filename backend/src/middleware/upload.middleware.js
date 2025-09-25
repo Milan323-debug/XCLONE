@@ -6,7 +6,12 @@ const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   // allow image and video mime types
-  if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+  // allow image, video and audio mime types
+  if (
+    file.mimetype.startsWith("image/") ||
+    file.mimetype.startsWith("video/") ||
+    file.mimetype.startsWith("audio/")
+  ) {
     cb(null, true);
   } else {
     cb(new Error("Only image or video files are allowed"), false);

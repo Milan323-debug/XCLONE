@@ -12,7 +12,7 @@ export default function FollowButton({ isFollowing, loading, onToggle, style }: 
   return (
     <TouchableOpacity
       onPress={() => { if (!loading) onToggle(); }}
-      style={[{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: isFollowing ? '#e5f3f1' : '#1DA1F2' }, style]}
+      style={[{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: isFollowing ? '#e5f3f1' : '#008B8B' }, style]}
       disabled={loading}
     >
       {loading ? (

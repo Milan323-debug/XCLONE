@@ -1,6 +1,8 @@
+import React from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet, Image } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { getProfileImageUri } from '../lib/utils';
 
 const LogoutButton = () => {
     const { logout } = useAuthStore();
@@ -28,22 +30,19 @@ const LogoutButton = () => {
       ? currentUser.name.charAt(0).toUpperCase() 
       : 'U';
 
+    const profileImageUri = React.useMemo(() => getProfileImageUri(currentUser), [currentUser]);
+
     return (
       <TouchableOpacity 
         style={styles.logoutButton} 
         onPress={confirmLogout}
         activeOpacity={0.7}
       >
-        {currentUser?.profileImage ? (
-          <Image 
-            source={{ uri: currentUser.profileImage }} 
-            style={styles.profileImage} 
-          />
-        ) : (
-          <View style={[styles.profileImage, styles.initialsContainer]}>
-            <Text style={styles.initialsText}>{userInitials}</Text>
-          </View>
-        )}
+        <Image 
+          source={{ uri: profileImageUri }} 
+          style={styles.profileImage}
+          defaultSource={require('../assets/images/default-avatar.png')}
+        />
       </TouchableOpacity>
     );
 };

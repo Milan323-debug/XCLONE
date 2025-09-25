@@ -13,6 +13,8 @@ import {
   Pressable,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { getProfileImageUri } from '../../lib/utils';
 import PostComposer from '../../components/PostComposer'
 import ProfilePostCard from '../../components/ProfilePostCard'
 import { useAuthStore } from '../../store/authStore'
@@ -28,6 +30,8 @@ export default function Profile() {
   const [posts, setPosts] = useState([])
   const [postsLoading, setPostsLoading] = useState(false)
   const [listModalVisible, setListModalVisible] = useState(false)
+
+  const profileImageUri = React.useMemo(() => getProfileImageUri(profileUser), [profileUser]);
   const [listModalType, setListModalType] = useState(null) // 'followers' | 'following'
   const [listUsers, setListUsers] = useState([])
   const [listLoading, setListLoading] = useState(false)
@@ -51,7 +55,7 @@ export default function Profile() {
       const json = await res.json()
       setProfileUser(json.user || user)
     } catch (e) {
-      console.warn(e.message)
+      // intentionally silence failed profile load to avoid noisy warnings in the console
     } finally {
       setLoading(false)
     }
@@ -159,8 +163,24 @@ export default function Profile() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.message || json.error || 'Failed to update')
       setProfileUser(json.user)
-      // update local authStore user copy
-      try { localStorage } catch (e) {}
+      // Persist and update global auth store so other screens pick up the new avatar
+      try {
+        await AsyncStorage.setItem('user', JSON.stringify(json.user));
+      } catch (e) {
+        console.warn('AsyncStorage set user failed', e);
+      }
+      try {
+        // update zustand store immediately
+        if (useAuthStore && typeof useAuthStore.setState === 'function') {
+          useAuthStore.setState({ user: json.user });
+        }
+        // also attempt to refresh from server for canonical data
+        if (useAuthStore && useAuthStore.getState && useAuthStore.getState().fetchMe) {
+          await useAuthStore.getState().fetchMe();
+        }
+      } catch (e) {
+        console.warn('refresh auth store after profile update failed', e);
+      }
     } catch (e) {
       Alert.alert('Update failed', e.message)
     } finally {
@@ -230,10 +250,13 @@ export default function Profile() {
           <Feather name="log-out" size={20} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
-
       <View style={styles.profileRow}>
         <TouchableOpacity onPress={() => pickImage(true)}>
-          <Image source={{ uri: profileUser?.profileImage || (profileUser?.profileImage?.secure_url) || 'https://i.pravatar.cc/80' }} style={styles.avatar} />
+          <Image 
+            source={{ uri: profileImageUri }} 
+            style={styles.avatar}
+            defaultSource={require('../../assets/images/default-avatar.png')}
+          />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12, paddingRight: 12 }}>
           <Text style={[styles.name, { marginTop: 6 }]}>{profileUser?.firstName ? `${profileUser.firstName} ${profileUser.lastName || ''}` : profileUser.username}</Text>
@@ -316,7 +339,7 @@ export default function Profile() {
                 const isFollowingItem = curFollowing.some((f) => String(f._id || f) === String(item._id || item.id));
                 return (
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: COLORS.border }}>
-                    <Image source={{ uri: item.profileImage || 'https://i.pravatar.cc/48' }} style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12 }} />
+                    <Image source={{ uri: getProfileImageUri(item) || 'https://i.pravatar.cc/48' }} style={{ width: 48, height: 48, borderRadius: 24, marginRight: 12 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontWeight: '700', color: COLORS.text }}>{item.firstName ? `${item.firstName} ${item.lastName || ''}` : item.username}</Text>
                       <Text style={{ color: COLORS.textLight }}>@{item.username}</Text>

@@ -2,6 +2,8 @@ import { COLORS } from "@/constants/colors";
 import { useCreatePost } from "../hooks/useCreatePost";
 import { useAuthStore } from "../store/authStore";
 import { Feather } from "@expo/vector-icons";
+import React from 'react';
+import { getProfileImageUri } from '../lib/utils';
 import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { Video } from "expo-av";
 
@@ -21,11 +23,28 @@ const PostComposer = () => {
   } = useCreatePost();
 
   const { user } = useAuthStore();
+  
+  const profileImageUri = React.useMemo(() => {
+    if (!user) return null;
+    const fallbackUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName || user.username || 'U')}&background=random`;
+    if (typeof user.profileImage === 'string') return user.profileImage;
+    if (user.profileImage && typeof user.profileImage === 'object' && user.profileImage.secure_url) {
+      return user.profileImage.secure_url;
+    }
+    if (user?.avatar && typeof user.avatar === 'string') return user.avatar;
+    return fallbackUri;
+  }, [user]);
+
+  // use centralized helper
+  const composerProfileImage = React.useMemo(() => getProfileImageUri(user), [user]);
 
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-  <Image source={{ uri: user?.profileImage || 'https://as1.ftcdn.net/v2/jpg/05/60/26/08/1000_F_560260880_O1V3Qm2cNO5HWjN66mBh2NrlPHNHOUxW.jpg' }} style={styles.avatar} />
+        <Image 
+          source={{ uri: composerProfileImage }} 
+          style={styles.avatar}
+          defaultSource={require('../assets/images/default-avatar.png')} />
         <View style={{ flex: 1 }}>
           <View style={styles.inputWrap}>
             <TextInput
@@ -68,13 +87,13 @@ const PostComposer = () => {
       <View style={styles.footerRow}>
         <View style={styles.leftIcons}>
           <TouchableOpacity style={styles.iconBtn} onPress={pickImageFromGallery} accessibilityLabel="Pick image">
-            <Feather name="image" size={20} color="#1DA1F2" />
+            <Feather name="image" size={20} color="#008B8B" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={pickVideoFromGallery} accessibilityLabel="Pick video">
-            <Feather name="video" size={20} color="#1DA1F2" />
+            <Feather name="video" size={20} color="#008B8B" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={takePhoto} accessibilityLabel="Take photo">
-            <Feather name="camera" size={20} color="#1DA1F2" />
+            <Feather name="camera" size={20} color="#008B8B" />
           </TouchableOpacity>
           {/* <TouchableOpacity style={styles.iconBtn} onPress={recordVideo} accessibilityLabel="Record video">
             <Feather name="video" size={20} color="#0ea5e9" />

@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import { Notification } from '../types/notification';
+import { getProfileImageUri } from '../lib/utils';
 
 interface NotificationCardProps {
   notification: Notification;
@@ -66,7 +67,7 @@ const NotificationCard = ({ notification, onDelete }: NotificationCardProps) => 
       
       <View style={styles.content}>
         <Image 
-          source={{ uri: notification.from.profileImage || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y' }} 
+          source={{ uri: getProfileImageUri(notification.from) || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y' }} 
           style={styles.avatar}
           defaultSource={require('../assets/images/default-avatar.png')}
         />

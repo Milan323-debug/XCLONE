@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../../constants/api';
 import { useAuthStore } from '../../store/authStore';
+import { getProfileImageUri } from '../../lib/utils';
 import FollowButton from '../../components/FollowButton';
 import ProfilePostCard from '../../components/ProfilePostCard';
 
@@ -65,6 +66,7 @@ export default function UserProfile() {
 
   const fetchUserPosts = async () => {
     if (!username) return;
+    setPostsLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/posts/user/${username}`);
       if (!res.ok) throw new Error('Failed to load posts');
@@ -203,9 +205,7 @@ export default function UserProfile() {
         {/* Profile Header */}
         <View style={styles.header}>
           <Image
-            source={{
-              uri: user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName || user.username)}&background=random`
-            }}
+            source={{ uri: getProfileImageUri(user) || undefined }}
             style={styles.profileImage}
           />
           
@@ -235,8 +235,13 @@ export default function UserProfile() {
 
         {/* Posts */}
         <View style={styles.postsContainer}>
-          {postsLoading ? (
-            <ActivityIndicator size="small" color="#1DA1F2" style={styles.postsLoading} />
+          {postsLoading && (!posts || posts.length === 0) ? (
+            <View style={styles.largeLoader}>
+              <ActivityIndicator size="large" color="#23D5D5" />
+              <Text style={styles.noPosts}>Loading posts...</Text>
+            </View>
+          ) : postsLoading ? (
+            <ActivityIndicator size="small" color="#23D5D5" style={styles.postsLoading} />
           ) : posts.length === 0 ? (
             <Text style={styles.noPosts}>No posts yet</Text>
           ) : (
@@ -339,10 +344,16 @@ const styles = StyleSheet.create({
   postsLoading: {
     marginTop: 20,
   },
+  largeLoader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
   noPosts: {
     textAlign: 'center',
     color: '#666',
-    marginTop: 20,
+    marginTop: 12,
     fontSize: 15,
   },
 });

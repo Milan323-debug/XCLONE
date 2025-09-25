@@ -7,6 +7,7 @@ import { formatRelativeTime } from '../lib/timeUtils';
 import UserProfileModal from './UserProfileModal';
 import { useAuthStore } from '../store/authStore';
 import FollowButton from './FollowButton';
+import { getProfileImageUri } from '../lib/utils';
 
 import type { Post, User, PostWithCommentUpdate } from '../types';
 
@@ -59,14 +60,7 @@ const PostCard: React.FC<Props> = ({ post, onLike, onDelete, onComment, currentU
     [author]
   );
 
-  const profileImageUri = React.useMemo(() => {
-    const fallbackUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`;
-    if (!author) return fallbackUri;
-    if (typeof author.profileImage === 'string') return author.profileImage;
-    if (author.profileImage && typeof author.profileImage === 'object' && author.profileImage.secure_url) return author.profileImage.secure_url;
-    if (author?.avatar && typeof author.avatar === 'string') return author.avatar;
-    return fallbackUri;
-  }, [author, authorName]);
+  const profileImageUri = React.useMemo(() => getProfileImageUri(author), [author]);
 
   // support legacy posts that used `image` or `imageUrl` and new `media` object
   const mediaUrl = React.useMemo(() => {
