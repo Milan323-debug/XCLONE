@@ -8,31 +8,48 @@ export let triggerRefetch: () => void = () => {};
 export const usePosts = (username?: string) => {
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
   const [error, setError] = useState<any>(null);
   const token = useAuthStore((s) => s.token);
+  const PAGE_LIMIT = 5;
+  const [skip, setSkip] = useState(0);
 
-  const fetchPosts = async () => {
-    setIsLoading(true);
+  const fetchPosts = async (opts?: { append?: boolean; skip?: number }) => {
+    const append = opts?.append || false;
+    const _skip = typeof opts?.skip === 'number' ? opts!.skip! : 0;
+    if (append) setIsLoadingMore(true); else setIsLoading(true);
     setError(null);
     try {
-  const base = API_URL.replace(/\/$/, '');
-  const url = username ? `${base}/api/posts/user/${encodeURIComponent(username)}` : `${base}/api/posts`;
+      const base = API_URL.replace(/\/$/, '');
+      const urlBase = username ? `${base}/api/posts/user/${encodeURIComponent(username)}` : `${base}/api/posts`;
+      const url = `${urlBase}?limit=${PAGE_LIMIT}&skip=${_skip}`;
       const res = await fetch(url);
       if (!res.ok) {
         const txt = await res.text();
         throw new Error(txt || 'Failed to fetch posts');
       }
       const data = await res.json();
-      setPosts(data.posts || []);
+      const fetched: any[] = data.posts || [];
+      if (append) {
+        setPosts((prev) => [...prev, ...fetched]);
+        setSkip((s) => s + fetched.length);
+      } else {
+        setPosts(fetched);
+        setSkip(fetched.length);
+      }
+      setTotal(typeof data.total === 'number' ? data.total : null);
     } catch (err) {
       setError(err);
     } finally {
-      setIsLoading(false);
+      if (append) setIsLoadingMore(false); else setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    void fetchPosts();
+    // initial load
+    setSkip(0);
+    void fetchPosts({ append: false, skip: 0 });
     // publish refetch
     triggerRefetch = fetchPosts;
     return () => {
@@ -42,7 +59,15 @@ export const usePosts = (username?: string) => {
   }, [username]);
 
   const refetch = async () => {
-    await fetchPosts();
+    setSkip(0);
+    await fetchPosts({ append: false, skip: 0 });
+  };
+
+  const loadMore = async () => {
+    // don't load more if already loading, or we already have all items
+    if (isLoadingMore) return;
+    if (typeof total === 'number' && posts.length >= total) return;
+    await fetchPosts({ append: true, skip });
   };
 
   const toggleLike = async (postId: string) => {
@@ -127,8 +152,11 @@ export const usePosts = (username?: string) => {
   return { 
     posts, 
     isLoading, 
+    isLoadingMore,
     error, 
     refetch, 
+    loadMore,
+    hasMore: typeof total === 'number' ? posts.length < total : true,
     toggleLike, 
     deletePost,
     updatePostLocally,

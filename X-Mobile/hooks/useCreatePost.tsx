@@ -266,9 +266,10 @@ export const useCreatePost = () => {
       aspect: undefined, // Allow free aspect ratio for all media
       quality: mediaKind === 'video' ? 0.3 : 0.6, // Lower quality to meet size limits
       exif: false,
-      mediaTypes: mediaKind === 'video' ? ImagePicker.MediaTypeOptions.Videos : 
-                 mediaKind === 'image' ? ImagePicker.MediaTypeOptions.Images :
-                 ImagePicker.MediaTypeOptions.All,
+      // Use the newer ImagePicker.MediaType API or arrays of them
+  mediaTypes: mediaKind === 'video' ? ImagePicker.MediaTypeOptions.Videos : 
+         mediaKind === 'image' ? ImagePicker.MediaTypeOptions.Images :
+         ImagePicker.MediaTypeOptions.All,
       videoMaxDuration: 30, // Limit to 30 seconds to help control file size
       allowsMultipleSelection: false,
       // Set video quality
@@ -279,8 +280,8 @@ export const useCreatePost = () => {
       })
     };
 
-    if (mediaKind === 'image') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Images;
-    if (mediaKind === 'video') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Videos;
+  if (mediaKind === 'image') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Images as any;
+  if (mediaKind === 'video') pickerOptions.mediaTypes = ImagePicker.MediaTypeOptions.Videos as any;
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync(pickerOptions)

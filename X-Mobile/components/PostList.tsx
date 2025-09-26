@@ -17,7 +17,7 @@ interface PostsListProps {
 
 const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
   const { currentUser } = useCurrentUser();
-  const { posts, isLoading, error, refetch, toggleLike, deletePost, checkIsLiked } =
+  const { posts, isLoading, isLoadingMore, error, refetch, toggleLike, deletePost, checkIsLiked, loadMore, hasMore } =
     usePosts(username);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
@@ -86,10 +86,34 @@ const PostsList = ({ username, onRefresh, refreshing }: PostsListProps) => {
         removeClippedSubviews={true}
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.5}
+        onEndReached={() => {
+          if (hasMore && !isLoadingMore) {
+            loadMore();
+          }
+        }}
         refreshing={refreshing}
         onRefresh={onRefresh}
         ListHeaderComponent={<View style={{ height: 10 }} />}
         contentContainerStyle={{ paddingBottom: 80 }}
+        ListFooterComponent={() => {
+          if (isLoadingMore) {
+            return (
+              <View style={{ padding: 12, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#23D5D5" />
+              </View>
+            );
+          }
+          if (hasMore) {
+            return (
+              <View style={{ padding: 12, alignItems: 'center' }}>
+                <TouchableOpacity style={styles.retryBtn} onPress={() => loadMore()}>
+                  <Text style={styles.retryText}>Load more</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return <View style={{ height: 40 }} />;
+        }}
       />
 
       <CommentsModal

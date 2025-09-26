@@ -3,9 +3,32 @@ import { Audio } from 'expo-av'
 
 export const usePlayerStore = create((set, get) => {
   const soundRef = { current: null }
+  let audioModeInitialized = false
+
+  const ensureAudioMode = async () => {
+    if (audioModeInitialized) return
+    try {
+      // Configure audio to continue playing in background and play in silent mode on iOS.
+      // Use a minimal, compatible audio mode configuration. Some expo-av versions
+      // have different sets of interruptionMode constants which can trigger
+      // "invalid value" errors; omitting them keeps this work across versions.
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: true,
+      })
+      audioModeInitialized = true
+    } catch (e) {
+      console.warn('Failed to set Audio mode', e)
+    }
+  }
 
   const playTrack = async (track, queue = null, index = 0) => {
     try {
+      // ensure audio mode is configured for background playback
+      await ensureAudioMode()
       // stop previous
       if (soundRef.current) {
         try { await soundRef.current.unloadAsync(); } catch (e) {}

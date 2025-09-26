@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "package": "com.cyan.app",
@@ -18,7 +21,18 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "foregroundService": {
+        "notification": {
+          "channelId": "playback",
+          "channelName": "Playback",
+          "title": "Cyan",
+          "body": "Playback is running",
+          "color": "#00BFAE",
+          "importance": "default",
+          "visibility": "public"
+        }
+      }
     },
     "web": {
       "bundler": "metro",

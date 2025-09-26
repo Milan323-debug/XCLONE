@@ -3,8 +3,9 @@ import PostsList from "../../components/PostList";
 import { usePosts, triggerRefetch } from "../../hooks/usePosts";
 import { useUserSync } from "../../hooks/useUserSync";
 import { useState } from "react";
-import { RefreshControl, ScrollView, Text, View, TouchableOpacity, Image } from "react-native";
+import { RefreshControl, ScrollView, Text, View, TouchableOpacity, Image, StyleSheet } from "react-native";
 import SignOutButton from "../../components/SignOutButton";
+import { COLORS } from '../../constants/colors';
 
 const HomeScreen = () => {
   const [isRefetching, setIsRefetching] = useState(false);
@@ -27,14 +28,14 @@ const HomeScreen = () => {
   useUserSync();
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#111827' }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <View style={[styles.headerRow]}>
         <View style={{ width: 48, alignItems: 'flex-start' }}>
           <Image source={require('../../assets/images/icon.png')} style={{ width: 40, height: 40, resizeMode: 'contain' }} />
         </View>
 
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F1419' }}>Home</Text>
+          <Text style={[styles.headerTitle]}>Home</Text>
         </View>
 
         <View style={{ width: 48, alignItems: 'flex-end' }}>
@@ -53,3 +54,8 @@ const HomeScreen = () => {
   );
 };
 export default HomeScreen;
+
+const styles = StyleSheet.create({
+  headerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.background },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+});

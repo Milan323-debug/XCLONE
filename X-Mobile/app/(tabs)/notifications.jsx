@@ -13,6 +13,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { COLORS } from "../../constants/colors";
 
 const NotificationsScreen = () => {
   const { notifications, isLoading, error, refetch, isRefetching, deleteNotification } =
@@ -24,7 +25,7 @@ const NotificationsScreen = () => {
     if (isLoading) {
       return (
         <View style={[styles.centeredContainer, styles.fullScreen]}>
-          <ActivityIndicator size="large" color="#23D5D5" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
       );
@@ -76,7 +77,7 @@ const NotificationsScreen = () => {
           <RefreshControl 
             refreshing={isRefetching} 
             onRefresh={refetch} 
-            tintColor="#1DA1F2"
+            tintColor={COLORS.primary}
           />
         }
       >
@@ -90,7 +91,7 @@ export default NotificationsScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.background,
   },
   scrollView: {
     flex: 1,
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.background,
   },
   headerRow: {
     flexDirection: 'row',
@@ -115,21 +116,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    backgroundColor: '#fff',
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.background,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: COLORS.text,
   },
   errorText: {
-    color: '#6b7280',
+    color: COLORS.textLight,
     marginBottom: 12,
     textAlign: 'center',
   },
   retryBtn: {
-    backgroundColor: '#1DA1F2',
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 9999,
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loadingText: {
-    color: '#6b7280',
+    color: COLORS.textLight,
     marginTop: 12,
     fontSize: 15,
   },

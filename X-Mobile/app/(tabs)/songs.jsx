@@ -119,12 +119,33 @@ export default function Songs() {
 
   const pickArtwork = async () => {
     try {
-      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+      // Use the modern mediaTypes API (ImagePicker.MediaType) and support different result shapes.
+  const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, allowsEditing: false });
       if (!res) return;
-      if (res.cancelled) return;
-      // res has uri, width, height
-      const name = res.uri.split('/').pop();
-      const normalized = { uri: res.uri, name, width: res.width, height: res.height, raw: res };
+      // Newer versions return { canceled: boolean, assets: [{ uri, fileName, width, height, type }] }
+      if (res.canceled === true) return;
+
+      let uri; let name; let width; let height;
+      if (Array.isArray(res.assets) && res.assets.length > 0) {
+        const asset = res.assets[0];
+        uri = asset.uri;
+        name = asset.fileName || asset.uri?.split('/').pop();
+        width = asset.width;
+        height = asset.height;
+      } else {
+        // legacy shape: { cancelled, uri, width, height }
+        uri = res.uri || res.uri;
+        name = res.fileName || (uri ? uri.split('/').pop() : undefined);
+        width = res.width;
+        height = res.height;
+      }
+
+      if (!uri) {
+        console.warn('pickArtwork: no uri returned from image picker', res);
+        return;
+      }
+
+      const normalized = { uri, name, width, height, raw: res };
       setPickedArtwork(normalized);
     } catch (e) {
       console.warn('pickArtwork', e);
@@ -350,12 +371,14 @@ export default function Songs() {
           value={title}
           onChangeText={setTitle}
           style={styles.input}
+          placeholderTextColor={COLORS.text}
         />
         <TextInput
           placeholder="Artist"
           value={artist}
           onChangeText={setArtist}
           style={styles.input}
+          placeholderTextColor={COLORS.text}
         />
 
         <TouchableOpacity

@@ -8,18 +8,26 @@ import Notification from "../models/notification.model.js";
 import Comment from "../models/comment.model.js";
 
 export const getPosts = asyncHandler(async (req, res) => {
-  const posts = await Post.find()
-    .sort({ createdAt: -1 })
-  .populate("user", "username firstName lastName profileImage")
+  const limit = parseInt(req.query.limit, 10) || undefined;
+  const skip = parseInt(req.query.skip, 10) || 0;
+
+  const query = Post.find().sort({ createdAt: -1 })
+    .populate("user", "username firstName lastName profileImage")
     .populate({
       path: "comments",
       populate: {
         path: "user",
-    select: "username firstName lastName profileImage",
+        select: "username firstName lastName profileImage",
       },
     });
 
-  res.status(200).json({ posts });
+  if (typeof skip === 'number' && skip > 0) query.skip(skip);
+  if (typeof limit === 'number') query.limit(limit);
+
+  const posts = await query.exec();
+  const total = await Post.countDocuments();
+
+  res.status(200).json({ posts, total });
 });
 
 export const getPost = asyncHandler(async (req, res) => {
@@ -46,18 +54,26 @@ export const getUserPosts = asyncHandler(async (req, res) => {
   const user = await User.findOne({ username });
   if (!user) return res.status(404).json({ error: "User not found" });
 
-  const posts = await Post.find({ user: user._id })
-    .sort({ createdAt: -1 })
-  .populate("user", "username firstName lastName profileImage")
+  const limit = parseInt(req.query.limit, 10) || undefined;
+  const skip = parseInt(req.query.skip, 10) || 0;
+
+  const query = Post.find({ user: user._id }).sort({ createdAt: -1 })
+    .populate("user", "username firstName lastName profileImage")
     .populate({
       path: "comments",
       populate: {
         path: "user",
-    select: "username firstName lastName profileImage",
+        select: "username firstName lastName profileImage",
       },
     });
 
-  res.status(200).json({ posts });
+  if (typeof skip === 'number' && skip > 0) query.skip(skip);
+  if (typeof limit === 'number') query.limit(limit);
+
+  const posts = await query.exec();
+  const total = await Post.countDocuments({ user: user._id });
+
+  res.status(200).json({ posts, total });
 });
 
 export const createPost = asyncHandler(async (req, res) => {
