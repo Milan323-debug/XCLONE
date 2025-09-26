@@ -10,6 +10,11 @@ const songSchema = new mongoose.Schema(
     mimeType: { type: String, default: "" },
     size: { type: Number, default: 0 },
     duration: { type: Number, default: 0 },
+    // optional artwork (cover image)
+    artworkUrl: { type: String, default: "" },
+    artworkPublicId: { type: String, default: "" },
+    artworkMimeType: { type: String, default: "" },
+    artworkSize: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

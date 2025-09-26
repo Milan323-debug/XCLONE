@@ -2,12 +2,15 @@ import { Ionicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
 import { View, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PlayerContainer from '../../components/PlayerContainer'
 
 
 const _layout = () => {
   const insets = useSafeAreaInsets();
   return (
-    <Tabs
+    <View style={{ flex: 1, position: 'relative' }}>
+      <PlayerContainer />
+      <Tabs
     screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#2bcbba',
@@ -17,6 +20,9 @@ const _layout = () => {
           height: 58,
           paddingBottom: 6,
           paddingTop: 6,
+          elevation: 12,
+          zIndex: 12,
+          backgroundColor: '#ffffff',
         }
     }}>
   <Tabs.Screen name="home" options={{
@@ -46,7 +52,7 @@ const _layout = () => {
       <Tabs.Screen name="songs" options={{
         title: "",
         tabBarIcon: ({color , size}) => (
-          <Ionicons name="play-circle-outline" size = {size} color={color} />
+          <Ionicons name="musical-notes" size = {size} color={color} />
         )
       }} />
       <Tabs.Screen name="profile" options={{
@@ -56,6 +62,8 @@ const _layout = () => {
         )
       }} />
     </Tabs>
+      <PlayerContainer />
+    </View>
   )
 }
 

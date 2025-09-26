@@ -24,6 +24,9 @@ export const createSong = asyncHandler(async (req, res) => {
 
   const { title, artist } = req.body;
   const file = req.file;
+  // optional artwork fields (if client uploaded artwork separately)
+  const artworkUrl = req.body.artworkUrl || null;
+  const artworkPublicId = req.body.artworkPublicId || null;
 
   // Support two flows:
   // 1) direct upload: client uploaded file to Cloudinary first and passes publicId+url in body
@@ -50,6 +53,9 @@ export const createSong = asyncHandler(async (req, res) => {
         publicId: uploadResponse.public_id || '',
         mimeType: file.mimetype,
         size: file.size || 0,
+        // if artwork metadata provided in body, include it
+        artworkUrl: artworkUrl || req.body.artworkUrl || '',
+        artworkPublicId: artworkPublicId || req.body.artworkPublicId || '',
       });
     } else {
       // pre-uploaded to Cloudinary path
@@ -61,6 +67,8 @@ export const createSong = asyncHandler(async (req, res) => {
         publicId: publicId,
         mimeType: req.body.mimeType || '',
         size: req.body.size || 0,
+        artworkUrl: artworkUrl || req.body.artworkUrl || '',
+        artworkPublicId: artworkPublicId || req.body.artworkPublicId || '',
       });
     }
 
@@ -115,6 +123,14 @@ export const deleteSong = asyncHandler(async (req, res) => {
         await cloudinary.uploader.destroy(song.publicId, { resource_type: 'raw' });
       } catch (e) {
         console.warn('Failed to delete cloudinary resource for song', e);
+      }
+    }
+    // delete artwork resource if exists
+    if (song.artworkPublicId) {
+      try {
+        await cloudinary.uploader.destroy(song.artworkPublicId, { resource_type: 'image' });
+      } catch (e) {
+        console.warn('Failed to delete cloudinary artwork for song', e);
       }
     }
 
